@@ -1,0 +1,1 @@
+#load in the values for all the different conditions of each participant and do a multi-way anova

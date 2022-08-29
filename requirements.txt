@@ -1,0 +1,9 @@
+h5py
+matplotlib
+scipy
+mne
+hypyp
+ipykernel
+pickle
+io
+os
