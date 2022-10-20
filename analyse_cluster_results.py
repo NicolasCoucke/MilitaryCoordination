@@ -29,7 +29,7 @@ frequencies = ['theta', 'alpha', 'beta', 'gamma']
 
 
 for frequency in range(4):
-    storePath = os.path.join(path, "python_data",  "desync_leader_clusters" + str(frequency) + ".pickle")
+    storePath = os.path.join(path, "python_data",  "_sync_egal_clusters" + str(frequency) + ".pickle")
     #open cluster results
     with open(storePath , "rb") as input_file:
         cluster_matrix, pval= pickle.load(input_file)
@@ -43,20 +43,20 @@ for frequency in range(4):
     print(cluster_matrix.shape)
     #epochs_object.info['chs'] = epochs_object.info['chs'][:64]
     #epochs_object.ch_names = epochs_object.ch_names[:64]
-    fig.suptitle("Sync Egal")
+    fig.suptitle("DeSync")
     ax = fig.add_subplot(4, 1, frequency + 1, aspect = 1)
     ax.set_title(frequencies[frequency] + " (p = " + str(pval) + ")" )
     ax.axis("off")
     viz.plot_2d_topomap_inter(ax)
     viz.plot_sensors_2d_inter(epochs_object, epochs_object, lab = False) # bads are represented as squares
-    viz.plot_links_2d_inter(epochs_object, epochs_object, C=cluster_matrix, threshold=2.7, steps=1)
+    viz.plot_links_2d_inter(epochs_object, epochs_object, C=cluster_matrix, threshold=2.5, steps=1)
 
 
 
 
 
 plt.tight_layout()
-plt.savefig(os.path.join(path, 'sync_clusters.png'))
+plt.savefig(os.path.join(path, 'full_clusters.png'))
 plt.show(block = True)
 
 #viz.viz_2D_topomap_inter(epo1 = epochs_object, epo2 = epochs_object, C = cluster_matrix, threshold = 3, steps = 10)

@@ -147,48 +147,55 @@ for frequency in range(4):
                                                                                     adjacency= ch_con_freq,
                                                                                     max_step = 2,
                                                                                     t_power=1,
-                                                                                    threshold = 2.7,
+                                                                                    threshold = 2.5,
                                                                                     out_type='mask')
-    print(Stat_obs.shape)
-    print(len(clusters))
-    print((clusters[0].shape))
-    print(cluster_p_values)
-    print(H0.shape)
-
-
-
+   
+   
     cluster_matrix = np.zeros((64,64))
     F_matrix = np.zeros((64,64))
     F_matrix_corrected = np.zeros((64,64))
-    cluster_array = clusters[np.argmin(cluster_p_values)]
+    min_cluster_value = 0
 
-    cluster_channels = np.array([0, 0])
-    #convert cluster data to matrix data
-    for connection in range(64*64):
-        channel_1 = int(np.floor(connection/64))
-        channel_2 = int(connection % 64)
-        F_matrix[channel_1, channel_2] = Stat_obs[connection]#int(cluster_array[connection,3])
-        cluster_matrix[channel_1, channel_2] = int(cluster_array[connection])
-        
+    try:
+        print(Stat_obs.shape)
+        print(len(clusters))
+        print((clusters[0].shape))
+        print(cluster_p_values)
+        print(H0.shape)
 
-        if cluster_array[connection] == True:
-            F_matrix_corrected[channel_1, channel_2] = Stat_obs[connection]
-            cluster_channels = np.vstack((cluster_channels, np.array([channel_1+1, channel_2+1])))
-        else:
-            F_matrix_corrected[channel_1, channel_2] = 0
-   # plt.imshow(F_matrix_corrected, cmap='hot', interpolation='nearest')
-   # plt.show(block=True)
 
-    cluster_channel_dict[frequencies[frequency]] = cluster_channels
 
+        cluster_array = clusters[np.argmin(cluster_p_values)]
+
+        cluster_channels = np.array([0, 0])
+        #convert cluster data to matrix data
+        for connection in range(64*64):
+            channel_1 = int(np.floor(connection/64))
+            channel_2 = int(connection % 64)
+            F_matrix[channel_1, channel_2] = Stat_obs[connection]#int(cluster_array[connection,3])
+            cluster_matrix[channel_1, channel_2] = int(cluster_array[connection])
+            
+
+            if cluster_array[connection] == True:
+                F_matrix_corrected[channel_1, channel_2] = Stat_obs[connection]
+                cluster_channels = np.vstack((cluster_channels, np.array([channel_1+1, channel_2+1])))
+            else:
+                F_matrix_corrected[channel_1, channel_2] = 0
+    # plt.imshow(F_matrix_corrected, cmap='hot', interpolation='nearest')
+    # plt.show(block=True)
+
+        cluster_channel_dict[frequencies[frequency]] = cluster_channels
+        min_cluster_value = np.min(cluster_p_values)
+    except:
+        print('no cluster found')
 
     #save result of permutation analysis
-    storePath = os.path.join(raw_path, "sync_clusters" + str(frequency) + ".pickle")
+    storePath = os.path.join(raw_path, "_sync_egal_clusters" + str(frequency) + ".pickle")
     with open(storePath, "wb") as output_file: 
-        pickle.dump([F_matrix_corrected, np.min(cluster_p_values)], output_file, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump([F_matrix_corrected, min_cluster_value], output_file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-sio.savemat(os.path.join(raw_path, 'cluster_channels_sync.mat'), cluster_channel_dict)
+sio.savemat(os.path.join(raw_path, 'cluster_channels_sync_egal.mat'), cluster_channel_dict)
 
 plt.imshow(F_matrix, cmap='hot', interpolation='nearest')
 plt.show(block=True)
