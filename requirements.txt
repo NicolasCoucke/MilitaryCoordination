@@ -4,6 +4,5 @@ scipy
 mne
 hypyp
 ipykernel
-pickle
 io
 os
