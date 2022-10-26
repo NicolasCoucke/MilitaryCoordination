@@ -52,29 +52,31 @@ raw_path = r"C:\Users\Administrator\Documents\MATLAB\Hyperscanning Analysis\pyth
 
 
 for pair in range(1,45):
-    # get alone data
-    filename = "pair_" + str(pair) + "_full_average_matrix_alone.mat"
-    filepath = os.path.join(raw_path, filename)
     try:
+          # get alone data
+        filename = "pair_" + str(pair) + "_zapline_full_average_matrix_sync_egal.mat"
+        filepath = os.path.join(raw_path, filename)
         mat_contents = sio.loadmat(filepath)
-    except:
-        print("pair " + str(pair) + "not found")
-    pair_data = np.asarray(mat_contents['averaged_data'])
-    stretched_pair_data = stretch_coupling_matrix(pair_data)
-    stretched_pair_data = np.expand_dims(stretched_pair_data, 0)
-    alone_array = np.vstack((alone_array, stretched_pair_data))
+        pair_data = np.asarray(mat_contents['averaged_data'])
+        stretched_pair_data = stretch_coupling_matrix(pair_data)
+        stretched_pair_data = np.expand_dims(stretched_pair_data, 0)
+        alone_array = np.vstack((alone_array, stretched_pair_data))
 
-    # get synchrony data
-    filename = "pair_" + str(pair) + "_full_average_matrix_sync_egal.mat"
-    filepath = os.path.join(raw_path, filename)
-    try:
+        # get synchrony data
+        filename = "pair_" + str(pair) + "_zapline_full_average_matrix_desync_egal.mat"
+        filepath = os.path.join(raw_path, filename)
+
         mat_contents = sio.loadmat(filepath)
+        pair_data = np.asarray(mat_contents['averaged_data'])
+        stretched_pair_data = stretch_coupling_matrix(pair_data)
+        stretched_pair_data = np.expand_dims(stretched_pair_data, 0)
+        sync_array = np.vstack((sync_array, stretched_pair_data))
+            
     except:
         print("pair " + str(pair) + "not found")
-    pair_data = np.asarray(mat_contents['averaged_data'])
-    stretched_pair_data = stretch_coupling_matrix(pair_data)
-    stretched_pair_data = np.expand_dims(stretched_pair_data, 0)
-    sync_array = np.vstack((sync_array, stretched_pair_data))
+
+
+   
 
     
 
@@ -135,7 +137,7 @@ for frequency in range(4):
     data = DATA
 
 
-    n_permutations = 5000
+    n_permutations = 1000
     tail = 0
     alpha = 0.05
     def stat_fun(*arg):
@@ -145,9 +147,9 @@ for frequency in range(4):
                                                                                     tail=tail,
                                                                                     n_permutations=n_permutations,
                                                                                     adjacency= ch_con_freq,
-                                                                                    max_step = 2,
+                                                                                    max_step = 1,
                                                                                     t_power=1,
-                                                                                    threshold = 2.5,
+                                                                                    threshold = 2.2,
                                                                                     out_type='mask')
    
    
@@ -195,7 +197,7 @@ for frequency in range(4):
         pickle.dump([F_matrix_corrected, min_cluster_value], output_file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-sio.savemat(os.path.join(raw_path, 'cluster_channels_sync_egal.mat'), cluster_channel_dict)
+    sio.savemat(os.path.join(raw_path, 'cluster_channels_desync_egal.mat'), cluster_channel_dict)
 
 plt.imshow(F_matrix, cmap='hot', interpolation='nearest')
 plt.show(block=True)

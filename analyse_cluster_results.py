@@ -49,8 +49,8 @@ for frequency in range(4):
     ax.axis("off")
     viz.plot_2d_topomap_inter(ax)
     viz.plot_sensors_2d_inter(epochs_object, epochs_object, lab = False) # bads are represented as squares
-    viz.plot_links_2d_inter(epochs_object, epochs_object, C=cluster_matrix, threshold=2.5, steps=1)
-
+    viz.plot_links_2d_inter(epochs_object, epochs_object, C=cluster_matrix, threshold=2., steps=1)
+    
 
 
 
