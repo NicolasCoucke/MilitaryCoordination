@@ -232,3 +232,182 @@ def dss_line(X, fline, sfreq, nremove=1, nfft=1024, nkeep=None, blocksize=None,
     print('Power of components removed by DSS: {:.2f}'.format(p))
     # return the reconstructed clean signal, and the artifact
     return y, X - y
+
+
+# helper function
+def _multiply_conjugate(real: np.ndarray, imag: np.ndarray, transpose_axes: tuple) -> np.ndarray:
+    """
+    Helper function to compute the product of a complex array and its conjugate.
+    It is designed specifically to collapse the last dimension of a four-dimensional array.
+    Arguments:
+        real: the real part of the array.
+        imag: the imaginary part of the array.
+        transpose_axes: axes to transpose for matrix multiplication.
+    Returns:
+        product: the product of the array and its complex conjugate.
+    """
+    formula = 'jilm,jimk->jilk'
+    product = np.einsum(formula, real, real.transpose(transpose_axes)) + \
+              np.einsum(formula, imag, imag.transpose(transpose_axes)) - 1j * \
+              (np.einsum(formula, real, imag.transpose(transpose_axes)) - \
+               np.einsum(formula, imag, real.transpose(transpose_axes)))
+
+    return product
+
+
+def _multiply_conjugate_time(real: np.ndarray, imag: np.ndarray, transpose_axes: tuple) -> np.ndarray:
+    """
+    Helper function to compute the product of a complex array and its conjugate.
+    Unlike _multiply_conjugate, this doenst collapse the last dimension of a 
+    four-dimensional array. Useful when computing some connectivity metrics 
+    (e.g., wpli), since it preserves the product values across e.g., time.
+    
+    Arguments:
+        real: the real part of the array.
+        imag: the imaginary part of the array.
+        transpose_axes: axes to transpose for matrix multiplication.
+    Returns:
+        product: the product of the array and its complex conjugate.
+    """
+    formula = 'jilm,jimk->jilkm'
+    product = np.einsum(formula, real, real.transpose(transpose_axes)) + \
+              np.einsum(formula, imag, imag.transpose(transpose_axes)) - 1j * \
+              (np.einsum(formula, real, imag.transpose(transpose_axes)) - \
+               np.einsum(formula, imag, real.transpose(transpose_axes)))
+    
+    return product
+
+def compute_sync(complex_signal: np.ndarray, mode: str, epochs_average: bool = True, save_memory: bool = False) -> np.ndarray:
+    """
+    Computes frequency- or time-frequency-domain connectivity measures from analytic signals.
+    Arguments:
+        complex_signal:
+            shape = (2, n_epochs, n_channels, n_freq_bins, n_times).
+            Analytic signals for computing connectivity between two participants.
+        mode:
+            Connectivity measure. Options in the notes.
+        epochs_average:
+            option to either return the average connectivity across epochs (collapse across time) or preserve epoch-by-epoch connectivity, boolean.
+            If False, PSD won't be averaged over epochs (the time course is maintained).
+            If True, PSD values are averaged over epochs.
+        save_memory:
+            option to create connectivity matrix epoch per epoch, rather than with all epochs at once.
+            is slower but prevents running out of memory
+
+    Returns:
+        con:
+            Connectivity matrix. The shape is either
+            (n_freq, n_epochs, 2*n_channels, 2*n_channels) if time_resolved is False,
+            or (n_freq, 2*n_channels, 2*n_channels) if time_resolved is True.
+            To extract inter-brain connectivity values, slice the last two dimensions of con with [0:n_channels, n_channels: 2*n_channels].
+    Note:
+        **supported connectivity measures**
+          - 'envelope_corr': envelope correlation
+          - 'pow_corr': power correlation
+          - 'plv': phase locking value
+          - 'ccorr': circular correlation coefficient
+          - 'coh': coherence
+          - 'imaginary_coh': imaginary coherence
+          - 'pli': phase lag index
+          - 'wpli': weighted phase lag index
+    """
+
+    n_epoch, n_ch, n_freq, n_samp = complex_signal.shape[1], complex_signal.shape[2], \
+                                    complex_signal.shape[3], complex_signal.shape[4]
+
+    # calculate all epochs at once, the only downside is that the disk may not have enough space
+    complex_signal_full = complex_signal.transpose((1, 3, 0, 2, 4)).reshape(n_epoch, n_freq, 2 * n_ch, n_samp)
+    transpose_axes = (0, 1, 3, 2)
+
+
+    if save_memory:
+        # loops through each epoch once
+        epoch_intervals = range(n_epoch) 
+    else:
+        # does one iteration that includes all epochs
+        epoch_intervals = [range(n_epoch)]
+
+
+    for epoch_range in epoch_intervals:
+
+        # take either full signal or one epoch
+        complex_signal = complex_signal_full[epoch_range, :, :, :].reshape(len(epoch_range), n_freq, 2 * n_ch, n_samp)
+
+        if mode.lower() == 'plv':
+            phase = complex_signal / np.abs(complex_signal)
+            c = np.real(phase)
+            s = np.imag(phase)
+            dphi = _multiply_conjugate(c, s, transpose_axes=transpose_axes)
+            con = abs(dphi) / n_samp
+
+        elif mode.lower() == 'envelope_corr':
+            env = np.abs(complex_signal)
+            mu_env = np.mean(env, axis=3).reshape(n_epoch, n_freq, 2 * n_ch, 1)
+            env = env - mu_env
+            con = np.einsum('nilm,nimk->nilk', env, env.transpose(transpose_axes)) / \
+                np.sqrt(np.einsum('nil,nik->nilk', np.sum(env ** 2, axis=3), np.sum(env ** 2, axis=3)))
+
+        elif mode.lower() == 'pow_corr':
+            env = np.abs(complex_signal) ** 2
+            mu_env = np.mean(env, axis=3).reshape(n_epoch, n_freq, 2 * n_ch, 1)
+            env = env - mu_env
+            con = np.einsum('nilm,nimk->nilk', env, env.transpose(transpose_axes)) / \
+                np.sqrt(np.einsum('nil,nik->nilk', np.sum(env ** 2, axis=3), np.sum(env ** 2, axis=3)))
+
+        elif mode.lower() == 'coh':
+            c = np.real(complex_signal)
+            s = np.imag(complex_signal)
+            amp = np.abs(complex_signal) ** 2
+            dphi = _multiply_conjugate(c, s, transpose_axes=transpose_axes)
+            con = np.abs(dphi) / np.sqrt(np.einsum('nil,nik->nilk', np.nansum(amp, axis=3),
+                                                np.nansum(amp, axis=3)))
+
+        elif mode.lower() == 'imaginary_coh':
+            c = np.real(complex_signal)
+            s = np.imag(complex_signal)
+            amp = np.abs(complex_signal) ** 2
+            dphi = _multiply_conjugate(c, s, transpose_axes=transpose_axes)
+            con = np.abs(np.imag(dphi)) / np.sqrt(np.einsum('nil,nik->nilk', np.nansum(amp, axis=3),
+                                                            np.nansum(amp, axis=3)))
+
+        elif mode.lower() == 'ccorr':
+            angle = np.angle(complex_signal)
+            mu_angle = circmean(angle, axis=3).reshape(n_epoch, n_freq, 2 * n_ch, 1)
+            angle = np.sin(angle - mu_angle)
+
+            formula = 'nilm,nimk->nilk'
+            con = np.einsum(formula, angle, angle.transpose(transpose_axes)) / \
+                np.sqrt(np.einsum('nil,nik->nilk', np.sum(angle ** 2, axis=3), np.sum(angle ** 2, axis=3)))
+            
+        elif mode.lower() == 'pli':
+            c = np.real(complex_signal)
+            s = np.imag(complex_signal)
+            dphi = _multiply_conjugate_time(c, s, transpose_axes=transpose_axes)
+            con = abs(np.mean(np.sign(np.imag(dphi)), axis=4))
+            
+        elif mode.lower() == 'wpli':
+            c = np.real(complex_signal)
+            s = np.imag(complex_signal)
+            dphi = _multiply_conjugate_time(c, s, transpose_axes=transpose_axes)
+            con_num = abs(np.mean(abs(np.imag(dphi)) * np.sign(np.imag(dphi)), axis=4))
+            con_den = np.mean(abs(np.imag(dphi)), axis=4)      
+            con_den[con_den == 0] = 1 
+            con = con_num / con_den        
+
+        else:
+            ValueError('Metric type not supported.')
+
+        if save_memory:
+            if epoch_range == 0:
+                aggregate_con = con
+            else:
+                aggregate_con = np.stack((aggregate_con, con), axis = 0)
+        
+    if save_memory:
+        con = aggregate_con
+    
+    con = con.swapaxes(0, 1)  # n_freq x n_epoch x 2*n_ch x 2*n_ch
+    if epochs_average:
+        con = np.nanmean(con, axis=1)
+
+    return con
