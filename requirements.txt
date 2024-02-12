@@ -1,8 +1,11 @@
 h5py
 matplotlib
+numpy
 scipy
-mne
-hypyp
-ipykernel
-io
-os
+#mne
+#hypyp
+#ipykernel
+#os
+#io
+#autoreject
+pickle
