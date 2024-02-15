@@ -390,7 +390,6 @@ def AR_local_custom(cleaned_epochs_ICA: list, n_interpolates, consensus_percs, s
     for clean_epochs in cleaned_epochs_ICA:  # per subj
         evoked_before.append(clean_epochs.average())
 
-<<<<<<< HEAD
     evoked_after_AR = []
     for clean in cleaned_epochs_AR:
         evoked_after_AR.append(clean.average())
@@ -570,13 +569,11 @@ def custom_ICA_fit(epochs: list, n_components: int, method: str, fit_params: dic
 
     return icas
 
-=======
     # Power of components
     p = wpwr(X - y)[0] / wpwr(X)[0]
     print('Power of components removed by DSS: {:.2f}'.format(p))
     # return the reconstructed clean signal, and the artifact
     return y, X - y
->>>>>>> bb305d047e5010a39ad7eac347c773040878d02c
 
 
 # helper function
@@ -622,12 +619,8 @@ def _multiply_conjugate_time(real: np.ndarray, imag: np.ndarray, transpose_axes:
     
     return product
 
-<<<<<<< HEAD
 
 def compute_sync(complex_signal: np.ndarray, mode: str, epochs_average: bool = True, save_memory: bool = False, epochs_per_iteration: int = 1) -> np.ndarray:
-=======
-def compute_sync(complex_signal: np.ndarray, mode: str, epochs_average: bool = True, save_memory: bool = False) -> np.ndarray:
->>>>>>> bb305d047e5010a39ad7eac347c773040878d02c
     """
     Computes frequency- or time-frequency-domain connectivity measures from analytic signals.
     Arguments:
@@ -643,10 +636,6 @@ def compute_sync(complex_signal: np.ndarray, mode: str, epochs_average: bool = T
         save_memory:
             option to create connectivity matrix epoch per epoch, rather than with all epochs at once.
             is slower but prevents running out of memory
-<<<<<<< HEAD
-=======
-
->>>>>>> bb305d047e5010a39ad7eac347c773040878d02c
     Returns:
         con:
             Connectivity matrix. The shape is either
@@ -675,7 +664,6 @@ def compute_sync(complex_signal: np.ndarray, mode: str, epochs_average: bool = T
 
     if save_memory:
         # loops through each epoch once
-<<<<<<< HEAD
         epoch_ranges = range(n_epoch) 
         epochs_per_iteration = epochs_per_iteration
 
@@ -689,18 +677,6 @@ def compute_sync(complex_signal: np.ndarray, mode: str, epochs_average: bool = T
 
         # take either full signal or one epoch
         complex_signal = complex_signal_full[epoch_range, :, :, :].reshape(epochs_per_iteration, n_freq, 2 * n_ch, n_samp)
-=======
-        epoch_intervals = range(n_epoch) 
-    else:
-        # does one iteration that includes all epochs
-        epoch_intervals = [range(n_epoch)]
-
-
-    for epoch_range in epoch_intervals:
-
-        # take either full signal or one epoch
-        complex_signal = complex_signal_full[epoch_range, :, :, :].reshape(len(epoch_range), n_freq, 2 * n_ch, n_samp)
->>>>>>> bb305d047e5010a39ad7eac347c773040878d02c
 
         if mode.lower() == 'plv':
             phase = complex_signal / np.abs(complex_signal)
@@ -741,11 +717,7 @@ def compute_sync(complex_signal: np.ndarray, mode: str, epochs_average: bool = T
 
         elif mode.lower() == 'ccorr':
             angle = np.angle(complex_signal)
-<<<<<<< HEAD
             mu_angle = circmean(angle, axis=3).reshape(epochs_per_iteration, n_freq, 2 * n_ch, 1) # used to be: .reshape(n_epochs, n_freq, 2 * n_ch, 1)
-=======
-            mu_angle = circmean(angle, axis=3).reshape(n_epoch, n_freq, 2 * n_ch, 1)
->>>>>>> bb305d047e5010a39ad7eac347c773040878d02c
             angle = np.sin(angle - mu_angle)
 
             formula = 'nilm,nimk->nilk'
@@ -774,12 +746,8 @@ def compute_sync(complex_signal: np.ndarray, mode: str, epochs_average: bool = T
             if epoch_range == 0:
                 aggregate_con = con
             else:
-<<<<<<< HEAD
                 #con = np.expand_dims(con, axis = 0)
                 aggregate_con = np.concatenate((aggregate_con, con), axis = 0)
-=======
-                aggregate_con = np.stack((aggregate_con, con), axis = 0)
->>>>>>> bb305d047e5010a39ad7eac347c773040878d02c
         
     if save_memory:
         con = aggregate_con
@@ -789,7 +757,6 @@ def compute_sync(complex_signal: np.ndarray, mode: str, epochs_average: bool = T
         con = np.nanmean(con, axis=1)
 
     return con
-<<<<<<< HEAD
 
 
 
@@ -971,5 +938,3 @@ def create_erp_epochs(trials, sfreq, old_events, old_event_id, event_id):
     events = (np.rint(events)).astype(int)
 
     return events
-=======
->>>>>>> bb305d047e5010a39ad7eac347c773040878d02c

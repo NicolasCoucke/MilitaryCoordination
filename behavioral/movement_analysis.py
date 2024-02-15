@@ -5,13 +5,15 @@ import matplotlib as mpl
 from Trial import TrialClass
 import os
 from scipy import signal
-from behavioral.Pair import PairClass
+from Pair import PairClass
 import scipy.io
 import seaborn as sns
 from scipy.fft import fft, fftfreq
 import pickle
 import re
 from scipy.stats import mannwhitneyu
+from scipy.signal import hilbert
+
 
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\behavioral data"
 os.chdir(path)
@@ -100,6 +102,105 @@ def load_points(condition, level):
     return Checkpos_x_1, Checkpos_y_1, Desyncpos_x_1, Desyncpos_y_1, Checkpos_x_2, Checkpos_y_2, Desyncpos_x_2, Desyncpos_y_2
 
 
+def calculate_KOP(signal1, signal2):
+    analytic_signal1 = hilbert(signal1)
+    analytic_signal2 = hilbert(signal2)
+
+    # Extract phase
+    phase1 = np.angle(analytic_signal1)
+    phase2 = np.angle(analytic_signal2)
+
+    phase_matrix = np.vstack((phase1, phase2))
+
+    KOP = np.abs(np.mean(np.exp(1j * phase_matrix), 0))
+    return KOP
+
+
+def calculate_phase_difference(signal1, signal2):
+    analytic_signal1 = hilbert(signal1)
+    analytic_signal2 = hilbert(signal2)
+
+    # Extract phase
+    phase1 = np.angle(analytic_signal1)
+    phase2 = np.angle(analytic_signal2)
+
+    phase2 - phase1
+
+    return phase2 - phase1
+
+def calculate_average_PLV(signal1, signal2, window_length, window_step):
+    # calculate windowed PLV
+    window_start = 0
+    window_end = window_start + window_length
+    simulation_length = len(signal1)
+    plv_in_time = []
+    interval_times = []
+
+    analytic_signal1 = hilbert(signal1)
+    analytic_signal2 = hilbert(signal2)
+
+    # Extract phase
+    phase1 = np.angle(analytic_signal1)
+    phase2 = np.angle(analytic_signal2)
+
+    
+
+    while (window_start + window_length) < simulation_length:
+        
+        interval_times.append(window_start + window_length/2)
+        # Compute phase difference
+        phase_difference = np.exp(1j * (phase2[window_start:window_end] - phase1[window_start:window_end]))
+
+        # Compute Phase Locking Value (PLV)
+        PLV = np.abs(np.mean(phase_difference))
+        counter = 0
+        window_start += window_step
+        window_end += window_step
+        counter += 1
+        plv_in_time.append(PLV)
+    
+
+
+    mean_plv = np.mean(plv_in_time)
+
+    return plv_in_time, interval_times, mean_plv
+
+
+def calculate_average_KOP(signal1, signal2, window_length, window_step):
+    # calculate windowed PLV
+    window_start = 0
+    window_end = window_start + window_length
+    simulation_length = len(signal1)
+    KOP_in_time = []
+    interval_times = []
+
+    analytic_signal1 = hilbert(signal1)
+    analytic_signal2 = hilbert(signal2)
+
+    # Extract phase
+    phase1 = np.angle(analytic_signal1)
+    phase2 = np.angle(analytic_signal2)
+
+    phase_matrix = np.vstack((phase1, phase2))
+
+
+
+    while (window_start + window_length) < simulation_length:
+        interval_times.append(window_start + window_length/2)
+        # Compute phase difference
+        KOP_raw = np.abs(np.mean(np.exp(1j * phase_matrix[:,window_start: window_end]), 0))
+
+        KOP = np.mean(KOP_raw)
+        counter = 0
+        window_start += window_step
+        window_end += window_step
+        counter += 1
+        KOP_in_time.append(KOP)
+
+    mean_KOP = np.mean(KOP_in_time)
+
+    return KOP_in_time, interval_times, mean_KOP
+
 
 Mil_Sync_Egal_dV = []
 Mil_Sync_LF_dV = []
@@ -126,6 +227,8 @@ ListList.append(CivilianList)
 Military_Completion_Times = []
 Civilian_Completion_Times = []
 
+
+
 print('start')
 #condition = 'Sync_Egalitarian'# 'Sync_Egalitarian': #'Desync_LF':#'Sync_Egalitarian':#'Sync_Solo':
 for Li in range(2):
@@ -137,11 +240,14 @@ for Li in range(2):
         Pair_Completion_Times = []
         Pair_Trial_Completion_Time = []
       #  print(pair.Pair)
-        for condition in ['Sync_Egalitarian', 'Sync_LF', 'Sync_FL']: #, 'Desync_Egalitarian', 'Desync_LF', 'Desync_FL']:
+        for condition in ['Sync_LF']: #, 'Desync_Egalitarian', 'Sync_LF', 'Sync_FL']:
             tries = np.zeros((20,))
             times = np.zeros((20,))
 
             for trial in pair.TrialList:
+
+                if trial.Success == False:
+                    continue
                 # print(trial.Success)
                 # print(trial.CompletionTime)
                 # continue
@@ -156,6 +262,12 @@ for Li in range(2):
             #         if trial.Success == True or 1: #and tries[trial.TrialNumber] == 1:
                     if float(trial.time[-1]) < 2: #or int(trial.TrialNumber) != 5:
                         continue
+                    
+                    
+                    # Create a single figure with three subplots
+                    fig, axs = plt.subplots(3, 1, figsize=(10, 15))
+
+                    
                     Checkpos_x_1, Checkpos_y_1, Desyncpos_x_1, Desyncpos_y_1, Checkpos_x_2, Checkpos_y_2, Desyncpos_x_2, Desyncpos_y_2 = load_points(condition, trial.TrialNumber)
                     #go to the start of actual movement
                     startindex = 0
@@ -171,9 +283,6 @@ for Li in range(2):
 
                     speed_1 = Moving_average(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),20)
                     speed_2 = Moving_average(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),20)
-
-                    plt.plot(speed_1)
-                    plt.show()
 
 
                     while movement_start == False:
@@ -228,7 +337,7 @@ for Li in range(2):
 
                             if ok == True:
                                 CheckCount+=1
-                                plt.axvspan(trial.time[startindex:][index_1], trial.time[startindex:][index_2], color='green', alpha=0.2)
+                                axs[0].axvspan(trial.time[startindex:][index_1], trial.time[startindex:][index_2], color='green', alpha=0.2)
                                 dTCheck+= np.abs(index_2-index_1)
 
 
@@ -264,12 +373,12 @@ for Li in range(2):
 
                             if ok == True:
                                 if condition == "Sync_Egalitarian" or condition == "Sync_LF" or condition == "Sync_FL":
-                                    plt.axvspan(trial.time[startindex:][index_1], trial.time[startindex:][index_2], color='green',
+                                    axs[0].axvspan(trial.time[startindex:][index_1], trial.time[startindex:][index_2], color='green',
                                                 alpha=0.2)
                                     dTCheck += np.abs(index_2 - index_1)
                                     CheckCount+=1
                                 else:
-                                    plt.axvspan(trial.time[startindex:][index_1], trial.time[startindex:][index_2], color='red', alpha=0.2)
+                                    axs[0].axvspan(trial.time[startindex:][index_1], trial.time[startindex:][index_2], color='red', alpha=0.2)
                                     dTDesync += np.abs(index_2 - index_1)
                                     DesyncCount+=1
 
@@ -288,19 +397,11 @@ for Li in range(2):
                         except:
                             dTDesync = np.nan
 
-                    # fig, ax = subplots
-                    # plt.plot(np.gradient(trial.Player_1_y[200:]))
-                    # plt.plot(np.gradient(trial.Player_2_y[200:]))
-                    #
-                    # player1plot, = ax.plot(trial.time[startindex:],speed_1[startindex:])
-                    # player1plot.set_label('Player 1')
-                    # player2plot, = ax.plot(trial.time[startindex:],speed_2[startindex:])
-                    # player2plot.set_label('Player 2')
-                    # ax.legend()
 
-                    player1plot, = plt.plot(trial.time[startindex+50:-50],speed_1[startindex+50:-50])
+
+                    player1plot, = axs[0].plot(trial.time[startindex+20:-20],speed_1[startindex+20:-20])
                     player1plot.set_label('Player 1')
-                    player2plot, = plt.plot(trial.time[startindex+50:-50],speed_2[startindex+50:-50])
+                    player2plot, = axs[0].plot(trial.time[startindex+20:-20],speed_2[startindex+20:-20])
                     player2plot.set_label('Player 2')
                     # ax.legend()
 
@@ -314,18 +415,52 @@ for Li in range(2):
                     average_acceleration = np.mean(Moving_average(grad_1_x[startindex:], 20))
 
                     dV = 0
-                    for index in range(startindex + 50, len(speed_1)-50):
+                    for index in range(startindex + 20, len(speed_1)-20):
                         dV += np.abs(speed_1[index] - speed_2[index]) / np.abs(speed_1[index] + speed_2[index])
                     dV = (2 / (len(speed_1) - 1 - startindex)) * dV
 
                     average_speed = np.mean(np.abs(speed_1[startindex:] + speed_2[startindex:]))/2
 
-                    plt.title('pair ' + str(pair.Pair) + ' dV ' + str(dV) +  ' corr ' + str(np.round(correlation[1,0],4)) + ' lag ' + str(k) + ' accel ' + str(np.round(average_acceleration, decimals = 2)))
+                    axs[0].set_title('pair ' + str(pair.Pair) + ' dV ' + str(dV) +  ' corr ' + str(np.round(correlation[1,0],4)) + ' lag ' + str(k) + ' accel ' + str(np.round(average_acceleration, decimals = 2)))
 
 
                     # player1plot, = plt.plot(trial.time[startindex:],speed_1[startindex:] - speed_2[startindex:])
-                    plt.show()
+                   # plt.show()
 
+                    
+
+
+
+                    #plt.show()
+                    analytic_signal1 = hilbert(speed_1[startindex+20:-20])
+                    analytic_signal2 = hilbert(speed_2[startindex+20:-20])
+
+                    # Extract phase
+                    phase1 = np.angle(analytic_signal1)
+                    phase2 = np.angle(analytic_signal2)
+                    phase_diff = phase2 - phase1
+                    axs[1].plot(trial.time[startindex+20:-20], phase1)
+                    axs[1].plot(trial.time[startindex+20:-20], phase2)
+                    #axs[1].plot(trial.time[startindex+20:-20], phase_diff)
+                    #plt.show()
+
+
+
+         
+                    modified_time = trial.time[startindex+20:-20]
+                    window_length = 20
+                    window_step = 1
+                    KOP_in_time, interval_times, mean_KOP = calculate_average_KOP(speed_1[startindex+20:-20], speed_2[startindex+20:-20], window_length, window_step)
+                    axs[2].plot([modified_time[int(i)] for i in interval_times], KOP_in_time)
+
+                    modified_time = trial.time[startindex+20:-20]
+                    window_length = 20
+                    window_step = 1
+                    PLV_in_time, interval_times, mean_plv = calculate_average_PLV(speed_1[startindex+20:-20], speed_2[startindex+20:-20], window_length, window_step)
+                    axs[2].plot([modified_time[int(i)] for i in interval_times],PLV_in_time)
+
+
+                    plt.show()
 
                     N = len(grad_1_x[startindex:])
 

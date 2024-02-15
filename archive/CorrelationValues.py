@@ -5,7 +5,7 @@ import matplotlib as mpl
 from Trial import TrialClass
 import os
 from scipy import signal
-from behavioral.Pair import PairClass
+from Pair import PairClass
 import scipy.io
 import seaborn as sns
 import pickle
@@ -77,7 +77,7 @@ def Calculate_Correlations(trial):
     return corr_value, k
 
 
-path = r"C:\Users\Administrator\Desktop\HYPERSCANNING_GAMEDATA"
+path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\behavioral data"
 os.chdir(path)
 
 with open(r"CivilianFiles.pickle", "rb") as input_file:
