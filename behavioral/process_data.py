@@ -1,7 +1,14 @@
 #########################
-# Perform timelock analysis with aggregate data of all participants
-#########################
+# Take the preprocessed data objects created with main_behavioral.py
+# and create:
+# 1) a data object with individual phases that can be linked to the EEG (at trial level - not yet evoked)
+# 2) a data file with behavioral measures that can be used for analysis in R
 
+# note: the data file with behavioral measures will created in two ways:
+# - once based on a moving window averaged across the complete trials
+# - once based on a 'evoked' segments that are extracted from crossing the checkpoints
+# note to self: make sure to alsways take into account introduced lags
+#########################
 
 import pandas as pd
 import numpy as np
@@ -10,6 +17,14 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.signal import hilbert
+
+# 1) data object for linking with EEG needs:
+# (only successful trials)
+# time series of the two (unlagged) phase time series
+# timestamps of when the checkpoint is crossed by each participant
+# beginning and end of the trial
+# order of the participants doing each condition
+
 
 
 def Moving_average(time_series, num_samples):
@@ -199,7 +214,7 @@ def get_phase_measures(PLV, KOP, index):
     KOP_trajectory = []
 
     # compensate for the fact that plv and kop have one window length lag
-    #index = index - 20
+    #index = index - 20 (not if we do not use the windowed plv etc)
 
     for traj_index in range(index - 100, index + 50):
         try:
@@ -326,7 +341,7 @@ def get_all_trajectories():
                         continue
 
                     if trial.Condition == condition:
-                        #print(condition)
+                       # print(condition)
                         sync = False
                         if (condition == 'Sync_Egalitarian') or (condition == 'Sync_LF') or (condition == 'Sync_FL'):
                             sync = True
@@ -375,7 +390,7 @@ def get_all_trajectories():
 
 
                         PLV = phase_diff
-                        KOP = np.abs(phase_diff)#KOP_raw
+                        KOP = KOP_raw
 
                         while movement_start == False:
                             startindex+=1
@@ -428,8 +443,7 @@ def get_all_trajectories():
                                             # get time locked trajectories if player one is first
                                             PLV_trajectory, KOP_trajectory = get_phase_measures(PLV, KOP, index_1)
 
-                                            # if player 1 is first than we should invert it so that the phase difference shows how much player one 'leads' before player 2
-                                            PLV_trajectory = [-x for x in PLV_trajectory]
+                                            
 
                                             # insert here procedure to get the plv and kop
 
@@ -501,8 +515,6 @@ def get_all_trajectories():
                                             # get time locked trajectories if player one is first
                                             PLV_trajectory, KOP_trajectory = get_phase_measures(PLV, KOP, index_1)
 
-                                            PLV_trajectory = [-x for x in PLV_trajectory]
-
                                             # insert here procedure to get the plv and kop
 
                                             new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory,
@@ -548,77 +560,3 @@ def get_all_trajectories():
 
 # uncomment this to get trajectories
 distance_trajectories = get_all_trajectories()
-
-with open(r"TimeLockedPhaseTrajectories.pickle", "rb") as input_file:
-    distance_trajectories = pickle.load(input_file)
-
-
-
-
-# make the 4 trajectory plots (for the 4 conditions)
-def plot_condition_trajectories(ax, distance_trajectories, parameters):
-    # first make the plot titles
-    title = ''
-    for key in parameters.keys():
-        if parameters[key]:
-            title = title + str(key)
-
-    # first plot the successful trials
-    parameters["group"] = 'military'
-    print(parameters)
-    select_trajectories = distance_trajectories
-    for key in parameters :
-        select_trajectories = select_trajectories[select_trajectories[key] == parameters[key]]
-    print(select_trajectories)
-
-    traj_PLV = select_trajectories.PLV_trajectory.to_list()
-    first_trajectories =np.array([np.array(xi) for xi in traj_PLV])
-
-    traj_KOP = select_trajectories.KOP_trajectory.to_list()
-    second_trajectories =np.array([np.array(xi) for xi in traj_KOP])
-
-    mean_first_trajectories = np.nanmean(first_trajectories, axis = 0)
-    mean_second_trajectories = np.nanmean(second_trajectories, axis = 0)
-    x = np.linspace(-1000,500,len(mean_second_trajectories))
-
-    ax.plot(x, mean_first_trajectories, color = 'green', linestyle = '-', alpha = 0.8)
-    ax.plot(x, mean_second_trajectories, color = 'green', linestyle = '--', alpha = 0.8)
-
-    parameters["group"] = 'civilian'
-    print(parameters)
-    select_trajectories = distance_trajectories
-    for key in parameters :
-        select_trajectories = select_trajectories[select_trajectories[key] == parameters[key]]
-    print(select_trajectories)
-
-    traj_PLV = select_trajectories.PLV_trajectory.to_list()
-    first_trajectories =np.array([np.array(xi) for xi in traj_PLV])
-
-    traj_KOP = select_trajectories.KOP_trajectory.to_list()
-    second_trajectories =np.array([np.array(xi) for xi in traj_KOP])
-
-    mean_first_trajectories = np.nanmean(first_trajectories, axis = 0)
-    mean_second_trajectories = np.nanmean(second_trajectories, axis = 0)
-    x = np.linspace(-1000,500,len(mean_second_trajectories))
-   
-    ax.plot(x, mean_first_trajectories, color = 'orange', linestyle = '-', alpha = 0.8)
-    ax.plot(x, mean_second_trajectories, color = 'orange', linestyle = '--', alpha = 0.8)
-
-
-    ax.plot(x, 0.7*np.ones(len(mean_first_trajectories)), color = 'black')
-    ax.axhline(y=0.7, color='black', linestyle='-')
-    ax.axvline(x=0, color='black', linestyle='-')
-    ax.axvline(x=200, color='black', linestyle='--', linewidth = 1)
-    ax.set_title(title)
-
-fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
-parameters = {"sync": True, "hierarchy": False}
-plot_condition_trajectories(ax1, distance_trajectories, parameters)
-parameters = {"sync": True, "hierarchy": True}
-plot_condition_trajectories(ax2, distance_trajectories, parameters)
-parameters = {"sync": False, "hierarchy": False}
-plot_condition_trajectories(ax3, distance_trajectories, parameters)
-parameters = {"sync": False, "hierarchy": True}
-plot_condition_trajectories(ax4, distance_trajectories, parameters)
-plt.show()
-

@@ -1,3 +1,6 @@
+######################
+# Take the preprocessed data and do single-trial moement analysis
+######################
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,6 +19,8 @@ from scipy.signal import hilbert
 
 
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\behavioral data"
+path = r"C:\Users\Administrator\Documents\Google\PhD documents\PhD documents\HYPERSCANNING_GAMEDATA"
+
 os.chdir(path)
 
 #how to exclude the big outlier positions at the beginning of trial??
@@ -444,9 +449,12 @@ for Li in range(2):
                     #axs[1].plot(trial.time[startindex+20:-20], phase_diff)
                     #plt.show()
 
+                    phase_matrix = np.vstack((phase1, phase2))
+                    KOP_raw = np.abs(np.mean(np.exp(1j * phase_matrix), 0))
+                    axs[2].plot(trial.time[startindex+20:-20], np.abs(phase2-phase1))#KOP_raw)
+                    axs[2].plot(trial.time[startindex+20:-20], phase2 - phase1)
 
-
-         
+                    """
                     modified_time = trial.time[startindex+20:-20]
                     window_length = 20
                     window_step = 1
@@ -458,7 +466,7 @@ for Li in range(2):
                     window_step = 1
                     PLV_in_time, interval_times, mean_plv = calculate_average_PLV(speed_1[startindex+20:-20], speed_2[startindex+20:-20], window_length, window_step)
                     axs[2].plot([modified_time[int(i)] for i in interval_times],PLV_in_time)
-
+                    """
 
                     plt.show()
 
