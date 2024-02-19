@@ -16,7 +16,7 @@ from mne_icalabel import label_components
 import scipy
 import scipy.signal as signal
 import scipy.stats
-from astropy.stats import circmean
+#from astropy.stats import circmean
 
 
 
@@ -115,6 +115,10 @@ def extract_trials(events):
 
 
 def create_sub_epochs(trials, sfreq):
+    """
+    # create epochs with sliding windows with length 1 and sliding 0.5
+    """
+
     events = np.empty(3,)
     event_successes = np.empty(3,)
     for trial_index in range(np.size(trials,0)):

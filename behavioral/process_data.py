@@ -48,7 +48,7 @@ def Moving_average(time_series, num_samples):
 
 print('testings')
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\behavioral data"
-path = r"C:\Users\Administrator\Documents\Google\PhD documents\PhD documents\HYPERSCANNING_GAMEDATA"
+#path = r"C:\Users\Administrator\Documents\Google\PhD documents\PhD documents\HYPERSCANNING_GAMEDATA"
 os.chdir(path)
 
 
@@ -255,54 +255,73 @@ all_data.append(CivilianList)
 fs = 100
 
 
-"""
-# test how much signal shift there is:
-for Li in range(2):
-    data = all_data[Li]
-    if Li == 0:
-        group = 'military'
-    else:
-        group = 'civilian'
-    paircounter = 0
-    for pair in data:
-        for condition in ['Sync_Egalitarian', 'Sync_LF', 'Sync_FL','Desync_Egalitarian', 'Desync_LF', 'Desync_FL']:
+
+def get_all_trajectories():
+    data_dictionary = pd.DataFrame(columns = ["group", "pair", "order", "interactive", "sync", "hierarchy", "trial", "num_tries", "completion_time"
+                                        "phase1", "phase2", "sync_crossings1", "desync_crossings1",  "sync_crossings2", "desync_crossings2", "startindex", "KOP_100", "KOP_20", "PLV_100", "PLV_20"])
+    for Li in range(2):
+        data = all_data[Li]
+        if Li == 0:
+            group = 'military'
+        else:
+            group = 'civilian'
+        paircounter = 0
+        num_tries = 0
+        for pair in data:
             for trial in pair.TrialList:
-
-                if trial.Success != True:
-                    continue
-
-                if trial.Condition == condition:
-                    print(condition)
+                num_tries +=1
+                if trial.Success == True:
+                    
                     sync = False
-                    if (condition == 'Sync_Egalitarian') or (condition == 'Sync_LF') or (condition == 'Sync_FL'):
+                    if (trial.Condition == 'Sync_Egalitarian') or (trial.Condition == 'Sync_LF') or (trial.Condition == 'Sync_FL'):
                         sync = True
 
-                    print('raw_len')
-                    print(len(trial.Player_1_x))
+                    hierarchy = True
+                    if (trial.Condition == 'Sync_Egalitarian') or (trial.Condition == 'Desync_Egalitarian'):
+                        hierarchy = False
+
+                    if trial.Condition == 'Sync_Solo':
+                        interactive = False
+                        sync = True
+                        hierarchy = False
+                    else:
+                        interactive = True
+                    
+                    CheckCount = 0
+                    DesyncCount = 0
+
+                    sync_crossings1 = dict()
+                    desync_crossings1 = dict()
+                    sync_crossings2 = dict()
+                    desync_crossings2 = dict()
+
+
+                    # check in each trial when there is a checkpoint being crossed
+                    Checkpos_x_1, Checkpos_y_1, Desyncpos_x_1, Desyncpos_y_1, Checkpos_x_2, Checkpos_y_2, Desyncpos_x_2, Desyncpos_y_2 = load_points(
+                        trial.Condition, trial.TrialNumber)
+                    
+
+                    startindex = 0
+                    movement_start = False
+
                     grad_1_x = np.gradient(np.asarray(trial.Player_1_x))
                     grad_2_x = np.gradient(np.asarray(trial.Player_2_x))
 
-                    print('grad_len')
-                    print(len(grad_1_x))
+
+
                     grad_1_y = np.gradient(np.asarray(trial.Player_1_y))
                     grad_2_y = np.gradient(np.asarray(trial.Player_2_y))
 
                     speed_1 = Moving_average(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),20)
                     speed_2 = Moving_average(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),20)
 
-                    print('speed_len')
-                    print(len(speed_1))
-
-                    
-                    startindex = 0
-                    movement_start = False
+                    analytic_signal1 = hilbert(speed_1)
+                    analytic_signal2 = hilbert(speed_2)
+                    full_phase1 = np.angle(analytic_signal1)
+                    full_phase2 = np.angle(analytic_signal2)
 
 
-                    PLV, interval_times, mean_PLV = calculate_average_PLV(speed_1[startindex:], speed_2[startindex:], 20, 1)
-                    KOP, interval_times, mean_KOP = calculate_average_KOP(speed_1[startindex:], speed_2[startindex:], 20, 1)
-
-                    print('kop_len')
-                    print(len(KOP))
+                    # get the moment when movement is started
                     while movement_start == False:
                         startindex+=1
                         try:
@@ -313,250 +332,125 @@ for Li in range(2):
                     if movement_start == False:
                         continue
 
+                    
+
+                   
+                    
+                    # calculate PLV and KOP only from the moment the movement is started 
+                    # but the phase should be for the complete signal so that it can be linked to the EEG data
+                    speed_1 = speed_1[startindex:-1]
+                    speed_2 = speed_2[startindex:-1]
+                    truncated_time = trial.time[startindex:-1]
+
+                    
+                    
+
+                    
+                    _, _, PLV_20 = calculate_average_PLV(speed_1, speed_2, 20, 10)
+                    _, _, KOP_20 = calculate_average_KOP(speed_1, speed_2, 20, 10)
+
+                    _, _, PLV_100 = calculate_average_PLV(speed_1, speed_2, 100, 50)
+                    _, _, KOP_100 = calculate_average_KOP(speed_1, speed_2, 100, 50)
+
+
+
+                    # safeguard to avoid large movement artefacts in the beginning?
                     Threshold_passed = False
                     for index in range(0,len(grad_1_x)-1):
                         if np.abs(grad_1_x[index]) > 2 or np.abs(grad_2_x[index]) > 2 or np.abs(
-                            grad_2_x[index]) > 2 or np.abs(grad_2_x[index]) > 2:
+                            grad_2_y[index]) > 2 or np.abs(grad_2_y[index]) > 2:
                             startindex = index + 10
-"""
-            
-                                            
+
+
+                    # get the corssings of all the checkpoints
+                    if sync:
+                        for checkpoint in range(len(Checkpos_x_1)):
+                            point_1 = [float(Checkpos_x_1[checkpoint]), float(Checkpos_y_1[checkpoint])]
+                            point_2 = [float(Checkpos_x_2[checkpoint]), float(Checkpos_y_2[checkpoint])]
+                            index_1 = 0
+                            ok = True
+                            crossed = False
+                            while crossed == False:
+                                index_1 += 1
+                                try:
+                                    trial.Player_1_x[index_1 + 1]
+                                    trial.Player_2_x[index_1 + 1]
+                                except:
+                                    ok = False
+                                    break
+                                distance_1 = distance([trial.Player_1_x[index_1], trial.Player_1_y[index_1]], point_1)
+                                distance_2 = distance([trial.Player_2_x[index_1], trial.Player_2_y[index_1]], point_2)
+
+                                if ok == True:
+
+
+                                    if distance_1 < 0.7:
+                                        sync_crossings1[checkpoint+1] = index_1
+
+                                    elif distance_2 < 0.7:
+                                        sync_crossings2[checkpoint+1] = index_1
+                                    
+
+                    else: # desync
+                        # do the same for the desynchrony points
+                        for checkpoint in range(len(Desyncpos_x_1)):
+                            point_1 = [float(Desyncpos_x_1[checkpoint]),
+                                        float(Desyncpos_y_1[checkpoint])]
+                            point_2 = [float(Desyncpos_x_2[checkpoint]),
+                                        float(Desyncpos_y_2[checkpoint])]
+                            index_1 = 0
+                            ok = True
+                            crossed = False
+                            while crossed == False:
+                                index_1 += 1
+                                try:
+                                    trial.Player_1_x[index_1 + 1]
+                                    trial.Player_2_x[index_1 + 1]
+                                except:
+                                    ok = False
+                                    break
+                                distance_1 = distance([trial.Player_1_x[index_1], trial.Player_1_y[index_1]],
+                                                        point_1)
+                                distance_2 = distance([trial.Player_2_x[index_1], trial.Player_2_y[index_1]],
+                                                        point_2)
+
+                                if ok == True:
+                                    if distance_1 < 0.7:
+                                        desync_crossings1[checkpoint+1] = index_1
+
+                                    elif distance_2 < 0.7:
+                                       desync_crossings2[checkpoint+1] = index_1
+                    
+
+                    new_row = {"group": group, "pair": pair.Pair, "order": 0, "interactive": interactive, "sync": sync, "hierarchy": hierarchy, "trial": trial.TrialNumber, "num_tries": num_tries,
+                                            "completion_time": trial.CompletionTime, "phase1": full_phase1, "phase2": full_phase2, "sync_crossings1": sync_crossings1, "desync_crossings1": desync_crossings1,
+                                                "sync_crossings2": sync_crossings2, "desync_crossings2": desync_crossings2, "startindex": startindex, 
+                                                "KOP_100": KOP_100, "KOP_20": KOP_20, "PLV_100":PLV_100, "PLV_20": PLV_20}
+                    data_dictionary = data_dictionary._append(new_row, ignore_index=True)
+                    num_tries = 0
 
 
 
-def get_all_trajectories():
-    distance_trajectories = pd.DataFrame(columns = ["KOP_trajectory", "PLV_trajectory", "pair", "success", "sync", "hierarchy", "who_first", "who_leader"])
-    for Li in range(2):
-        data = all_data[Li]
-        if Li == 0:
-            group = 'military'
-        else:
-            group = 'civilian'
-        paircounter = 0
-        for pair in data:
-            for condition in ['Sync_Egalitarian', 'Sync_LF', 'Sync_FL','Desync_Egalitarian', 'Desync_LF', 'Desync_FL']:
-                for trial in pair.TrialList:
-
-                    if trial.Success != True:
-                        continue
-
-                    if trial.Condition == condition:
-                       # print(condition)
-                        sync = False
-                        if (condition == 'Sync_Egalitarian') or (condition == 'Sync_LF') or (condition == 'Sync_FL'):
-                            sync = True
-
-                        hierarchy = True
-                        if (condition == 'Sync_Egalitarian') or (condition == 'Desync_Egalitarian'):
-                            hierarchy = False
-                        CheckCount = 0
-                        DesyncCount = 0
-                        # check in each trial when there is a checkpoint being crossed
-                        Checkpos_x_1, Checkpos_y_1, Desyncpos_x_1, Desyncpos_y_1, Checkpos_x_2, Checkpos_y_2, Desyncpos_x_2, Desyncpos_y_2 = load_points(
-                            condition, trial.TrialNumber)
-                        
-
-                        startindex = 0
-                        movement_start = False
-
-                        grad_1_x = np.gradient(np.asarray(trial.Player_1_x))
-                        grad_2_x = np.gradient(np.asarray(trial.Player_2_x))
-
-
-
-                        grad_1_y = np.gradient(np.asarray(trial.Player_1_y))
-                        grad_2_y = np.gradient(np.asarray(trial.Player_2_y))
-
-                        speed_1 = Moving_average(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),20)
-                        speed_2 = Moving_average(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),20)
-
-                        #PLV, interval_times, mean_PLV = calculate_average_PLV(speed_1[startindex:], speed_2[startindex:], 20, 1)
-                        #KOP, interval_times, mean_KOP = calculate_average_KOP(speed_1[startindex:], speed_2[startindex:], 20, 1)
-                            
-                        #plt.show()
-                        analytic_signal1 = hilbert(speed_1[startindex+20:-20])
-                        analytic_signal2 = hilbert(speed_2[startindex+20:-20])
-
-                        # Extract phase
-                        phase1 = np.angle(analytic_signal1)
-                        phase2 = np.angle(analytic_signal2)
-                        phase_diff = phase2 - phase1
-
-                        #axs[1].plot(trial.time[startindex+20:-20], phase_diff)
-                        #plt.show()
-
-                        phase_matrix = np.vstack((phase1, phase2))
-                        KOP_raw = np.abs(np.mean(np.exp(1j * phase_matrix), 0))
-
-
-                        PLV = phase_diff
-                        KOP = KOP_raw
-
-                        while movement_start == False:
-                            startindex+=1
-                            try:
-                                if grad_1_x[startindex] != 0 or grad_2_x[startindex] != 0 or grad_1_y[startindex] != 0 or grad_1_y[startindex] != 0:
-                                    movement_start = True
-                            except:
-                                break
-                        if movement_start == False:
-                            continue
-
-                        Threshold_passed = False
-                        for index in range(0,len(grad_1_x)-1):
-                            if np.abs(grad_1_x[index]) > 2 or np.abs(grad_2_x[index]) > 2 or np.abs(
-                                grad_2_x[index]) > 2 or np.abs(grad_2_x[index]) > 2:
-                                startindex = index + 10
-
-                        if sync:
-                            for checkpoint in range(len(Checkpos_x_1)):
-                                point_1 = [float(Checkpos_x_1[checkpoint]), float(Checkpos_y_1[checkpoint])]
-                                point_2 = [float(Checkpos_x_2[checkpoint]), float(Checkpos_y_2[checkpoint])]
-                                index_1 = 0
-                                ok = True
-                                crossed = False
-                                while crossed == False:
-                                    index_1 += 1
-                                    try:
-                                        trial.Player_1_x[index_1 + 1]
-                                        trial.Player_2_x[index_1 + 1]
-                                    except:
-                                        ok = False
-                                        break
-                                    distance_1 = distance([trial.Player_1_x[index_1], trial.Player_1_y[index_1]], point_1)
-                                    distance_2 = distance([trial.Player_2_x[index_1], trial.Player_2_y[index_1]], point_2)
-
-                                    if ok == True:
-
-
-                                        if distance_1 < 0.7:
-                                            who_leader = 'None'
-                                            who_first = 'None'
-                                            crossed = True
-                                            if (condition == 'Sync_LF'):
-                                                who_first = 'leader'
-                                                who_leader = 1
-                                            elif (condition == 'Sync_FL'):
-                                                who_first = 'follower'
-                                                who_leader = 2
-
-                                            # get time locked trajectories if player one is first
-                                            PLV_trajectory, KOP_trajectory = get_phase_measures(PLV, KOP, index_1)
-
-                                            
-
-                                            # insert here procedure to get the plv and kop
-
-                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory,
-                                                       "group": group, "pair": pair.Pair,
-                                                       "success": True, "sync": True, "hierarchy": hierarchy,
-                                                       "who_first": who_first,
-                                                       "who_leader": who_leader}
-                                            distance_trajectories = distance_trajectories._append(new_row,
-                                                                                                 ignore_index=True)
-                                        elif distance_2 < 0.7:
-                                            who_leader = 'None'
-                                            who_first = 'None'
-                                            crossed = True
-                                            if (condition == 'Sync_FL'):
-                                                who_first = 'leader'
-                                                who_leader = 2
-                                            if (condition == 'Sync_LF'):
-                                                who_first = 'follower'
-                                                who_leader = 1
-
-                                            # get time locked trajectories if player one is first
-                                            PLV_trajectory, KOP_trajectory = get_phase_measures(PLV, KOP, index_1)
-
-                                            # insert here procedure to get the plv and kop
-
-                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory,
-                                                       "success": True, "sync": True, "hierarchy": hierarchy, "who_first": who_first,
-                                                       "who_leader": who_leader}
-                                            distance_trajectories = distance_trajectories._append(new_row, ignore_index=True)
-
-                        else: # desync
-                            # do the same for the desynchrony points
-                            for checkpoint in range(len(Desyncpos_x_1)):
-                                point_1 = [float(Desyncpos_x_1[checkpoint]),
-                                           float(Desyncpos_y_1[checkpoint])]
-                                point_2 = [float(Desyncpos_x_2[checkpoint]),
-                                           float(Desyncpos_y_2[checkpoint])]
-                                index_1 = 0
-                                ok = True
-                                crossed = False
-                                while crossed == False:
-                                    index_1 += 1
-                                    try:
-                                        trial.Player_1_x[index_1 + 1]
-                                        trial.Player_2_x[index_1 + 1]
-                                    except:
-                                        ok = False
-                                        break
-                                    distance_1 = distance([trial.Player_1_x[index_1], trial.Player_1_y[index_1]],
-                                                          point_1)
-                                    distance_2 = distance([trial.Player_2_x[index_1], trial.Player_2_y[index_1]],
-                                                          point_2)
-
-                                    if ok == True:
-                                        if distance_1 < 0.7:
-                                            who_leader = 'None'
-                                            who_first = 'None'
-                                            crossed = True
-                                            if (condition == 'Desync_LF'):
-                                                who_first = 'leader'
-                                                who_leader = 1
-                                            elif (condition == 'Desync_FL'):
-                                                who_first = 'follower'
-                                                who_leader = 2
-
-                                            # get time locked trajectories if player one is first
-
-                                            # get time locked trajectories if player one is first
-                                            PLV_trajectory, KOP_trajectory = get_phase_measures(PLV, KOP, index_1)
-
-                                            # insert here procedure to get the plv and kop
-
-                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory,
-                                                       "group": group, "pair": pair.Pair,
-                                                       "success": True, "sync": False, "hierarchy": hierarchy,
-                                                       "who_first": who_first,
-                                                       "who_leader": who_leader}
-                                            distance_trajectories = distance_trajectories._append(new_row,
-                                                                                                 ignore_index=True)
-
-                                        elif distance_2 < 0.7:
-                                            who_leader = 'None'
-                                            who_first = 'None'
-                                            crossed = True
-                                            if (condition == 'Desync_FL'):
-                                                who_first = 'leader'
-                                                who_leader = 2
-                                            if (condition == 'Desync_LF'):
-                                                who_first = 'follower'
-                                                who_leader = 1
-
-                                            # get time locked trajectories if player one is first
-                                            PLV_trajectory, KOP_trajectory = get_phase_measures(PLV, KOP, index_1)
-
-                                            # insert here procedure to get the plv and kop
-
-                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory,
-                                                       "group": group, "pair": pair.Pair,
-                                                       "success": True, "sync": False, "hierarchy": hierarchy, "who_first": who_first,
-                                                       "who_leader": who_leader}
-                                            distance_trajectories = distance_trajectories._append(new_row, ignore_index=True)
-
-
-
-
-
-    with open(r"TimeLockedPhaseTrajectories.pickle", "wb") as output_file:
-        pickle.dump(distance_trajectories, output_file, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(r"Behavioral_Dataframe.pickle", "wb") as output_file:
+        pickle.dump(data_dictionary, output_file, protocol=pickle.HIGHEST_PROTOCOL)
     print("done")
 
 
-    return distance_trajectories
+    return data_dictionary
 
 # uncomment this to get trajectories
-distance_trajectories = get_all_trajectories()
+data_dictionary = get_all_trajectories()
+
+with open(r"Behavioral_Dataframe.pickle", "rb") as input_file:
+    data_dictionary = pickle.load(input_file)
+
+
+# Filter out columns with unwanted data types and select specific columns
+filtered_columns = ['group', 'pair', 'order', 'interactive', 'sync', 'hierarchy', 'trial', 'num_tries', 'completion_time', 'KOP_100', 'KOP_20', 'PLV_100', 'PLV_20']
+
+# Write DataFrame to Excel file
+with pd.ExcelWriter("data_dictionary.xlsx") as writer:
+    # Ensure there's at least one row of data
+    if not data_dictionary.empty:
+        data_to_write = data_dictionary[filtered_columns]
+        data_to_write.to_excel(writer, index=False, sheet_name="Sheet1")

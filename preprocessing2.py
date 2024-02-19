@@ -17,12 +17,7 @@ import pickle
 #print(sys.path)
 sys.path.append('C:/Users/Administrateur/MilitaryCoordination/')
 
-from hypyp import (
-    prep,)  # need pip install https://api.github.com/repos/autoreject/autoreject/zipball/master
-from hypyp import analyses
-from hypyp import prep
-from hypyp import stats
-from hypyp import viz
+
 import autoreject
 
 import copy
@@ -31,7 +26,7 @@ from my_utils import extract_trials, create_sub_epochs, AR_local_custom, ICA_aut
 
 
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\MilitaryCoordination"
-raw_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\MilitaryCoordination\raw data"
+raw_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\raw data"
 prep_path = os.path.join(path, "preprocessed data")
 log_path = os.path.join(path, "logs")
 
@@ -208,7 +203,9 @@ for root, dirs, files in os.walk(raw_path):
             fig = mne.viz.plot_raw_psd(raw_2, area_mode='range', average=False)
             plt.savefig(os.path.join(log_folder_path, 'after_interpolation_2_spectrum'))
 
-            
+            fig = raw.plot()
+            fig.fake_keypress("a")
+
             # now divide them back into epochs
             epochs_1 = mne.Epochs(raw_1, events, event_id, event_repeated = 'drop', on_missing = 'ignore', tmin=0, tmax=1, preload=True, baseline=(0, 0))
             epochs_2 = mne.Epochs(raw_2, events, event_id, event_repeated = 'drop', on_missing = 'ignore', tmin=0, tmax=1, preload=True, baseline=(0, 0))

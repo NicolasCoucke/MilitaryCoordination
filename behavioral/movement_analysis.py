@@ -19,7 +19,7 @@ from scipy.signal import hilbert
 
 
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\behavioral data"
-path = r"C:\Users\Administrator\Documents\Google\PhD documents\PhD documents\HYPERSCANNING_GAMEDATA"
+#path = r"C:\Users\Administrator\Documents\Google\PhD documents\PhD documents\HYPERSCANNING_GAMEDATA"
 
 os.chdir(path)
 
@@ -289,6 +289,9 @@ for Li in range(2):
                     speed_1 = Moving_average(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),20)
                     speed_2 = Moving_average(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),20)
 
+                    speed_1 = speed_1[:-1]
+                    speed_2 = speed_2[:-1]
+                    trial.time = trial.time[:-1]
 
                     while movement_start == False:
                         startindex+=1
@@ -404,9 +407,9 @@ for Li in range(2):
 
 
 
-                    player1plot, = axs[0].plot(trial.time[startindex+20:-20],speed_1[startindex+20:-20])
+                    player1plot, = axs[0].plot(trial.time[startindex:],speed_1[startindex:])
                     player1plot.set_label('Player 1')
-                    player2plot, = axs[0].plot(trial.time[startindex+20:-20],speed_2[startindex+20:-20])
+                    player2plot, = axs[0].plot(trial.time[startindex:],speed_2[startindex:])
                     player2plot.set_label('Player 2')
                     # ax.legend()
 
@@ -437,9 +440,10 @@ for Li in range(2):
 
 
                     #plt.show()
-                    analytic_signal1 = hilbert(speed_1[startindex+20:-20])
-                    analytic_signal2 = hilbert(speed_2[startindex+20:-20])
+                    analytic_signal1 = hilbert(speed_1[startindex:])
+                    analytic_signal2 = hilbert(speed_2[startindex:])
 
+                    """
                     # Extract phase
                     phase1 = np.angle(analytic_signal1)
                     phase2 = np.angle(analytic_signal2)
@@ -455,19 +459,24 @@ for Li in range(2):
                     axs[2].plot(trial.time[startindex+20:-20], phase2 - phase1)
 
                     """
-                    modified_time = trial.time[startindex+20:-20]
-                    window_length = 20
+                    modified_time = trial.time[startindex:]
+                    window_length = 100
                     window_step = 1
-                    KOP_in_time, interval_times, mean_KOP = calculate_average_KOP(speed_1[startindex+20:-20], speed_2[startindex+20:-20], window_length, window_step)
+                    KOP_in_time, interval_times, mean_KOP = calculate_average_KOP(speed_1[startindex:], speed_2[startindex:], window_length, window_step)
                     axs[2].plot([modified_time[int(i)] for i in interval_times], KOP_in_time)
 
-                    modified_time = trial.time[startindex+20:-20]
                     window_length = 20
-                    window_step = 1
-                    PLV_in_time, interval_times, mean_plv = calculate_average_PLV(speed_1[startindex+20:-20], speed_2[startindex+20:-20], window_length, window_step)
-                    axs[2].plot([modified_time[int(i)] for i in interval_times],PLV_in_time)
-                    """
+                    KOP_in_time, interval_times, mean_KOP = calculate_average_KOP(speed_1[startindex:], speed_2[startindex:], window_length, window_step)
+                    axs[1].plot([modified_time[int(i)] for i in interval_times], KOP_in_time)
 
+                    modified_time = trial.time[startindex:]
+                    window_length = 100
+                    window_step = 1
+                    PLV_in_time, interval_times, mean_plv = calculate_average_PLV(speed_1[startindex:], speed_2[startindex:], window_length, window_step)
+                    axs[2].plot([modified_time[int(i)] for i in interval_times],PLV_in_time)
+                    window_length = 20
+                    PLV_in_time, interval_times, mean_plv = calculate_average_PLV(speed_1[startindex:], speed_2[startindex:], window_length, window_step)
+                    axs[1].plot([modified_time[int(i)] for i in interval_times],PLV_in_time)
                     plt.show()
 
                     N = len(grad_1_x[startindex:])

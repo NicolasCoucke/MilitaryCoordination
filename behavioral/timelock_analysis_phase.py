@@ -33,7 +33,7 @@ def Moving_average(time_series, num_samples):
 
 print('testings')
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\behavioral data"
-path = r"C:\Users\Administrator\Documents\Google\PhD documents\PhD documents\HYPERSCANNING_GAMEDATA"
+#path = r"C:\Users\Administrator\Documents\Google\PhD documents\PhD documents\HYPERSCANNING_GAMEDATA"
 os.chdir(path)
 
 
@@ -355,8 +355,7 @@ def get_all_trajectories():
                         speed_1 = Moving_average(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),20)
                         speed_2 = Moving_average(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),20)
 
-                        #PLV, interval_times, mean_PLV = calculate_average_PLV(speed_1[startindex:], speed_2[startindex:], 20, 1)
-                        #KOP, interval_times, mean_KOP = calculate_average_KOP(speed_1[startindex:], speed_2[startindex:], 20, 1)
+                        
                             
                         #plt.show()
                         analytic_signal1 = hilbert(speed_1[startindex+20:-20])
@@ -376,6 +375,7 @@ def get_all_trajectories():
 
                         PLV = phase_diff
                         KOP = np.abs(phase_diff)#KOP_raw
+                        
 
                         while movement_start == False:
                             startindex+=1

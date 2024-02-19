@@ -11,7 +11,7 @@ from scipy import signal
 from behavioral.Pair import PairClass
 import scipy.io
 import h5py
-from behavioral.CorrelationValues import Calculate_Correlations, get_trial_processed_values
+from archive.CorrelationValues import Calculate_Correlations, get_trial_processed_values
 
 path = r"C:\Users\Administrator\Desktop\HYPERSCANNING_GAMEDATA"
 os.chdir(path)
