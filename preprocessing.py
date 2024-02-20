@@ -31,7 +31,7 @@ from my_utils import extract_trials, create_sub_epochs, AR_local_custom, ICA_aut
 
 
 path = r"F:/hyperscanning_mne"
-raw_path = r"F:/Hyperscanning_eeg_data"
+raw_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\raw data"
 prep_path = os.path.join(path, "preprocessed data")
 log_path = os.path.join(path, "logs")
 
@@ -50,8 +50,8 @@ for root, dirs, files in os.walk(raw_path):
             split_name = name.split("P")
             pair = int ((int(split_name[1]) + 1) / 2)
 
-            if not (pair in range(37,45)):
-                continue
+           # if not (pair in range(37,45)):
+            #    continue
             #if (pair == 33) or (pair == 28) or (pair == 15) or (pair == 12):
             #   continue
 

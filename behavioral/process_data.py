@@ -257,7 +257,7 @@ fs = 100
 
 
 def get_all_trajectories():
-    data_dictionary = pd.DataFrame(columns = ["group", "pair", "order", "interactive", "sync", "hierarchy", "trial", "num_tries", "completion_time"
+    data_dictionary = pd.DataFrame(columns = ["group", "pair", "order", "interactive", "sync", "hierarchy", "who_leader", "trial", "num_tries", "completion_time"
                                         "phase1", "phase2", "sync_crossings1", "desync_crossings1",  "sync_crossings2", "desync_crossings2", "startindex", "KOP_100", "KOP_20", "PLV_100", "PLV_20"])
     for Li in range(2):
         data = all_data[Li]
@@ -274,7 +274,7 @@ def get_all_trajectories():
                     
                     sync = False
                     if (trial.Condition == 'Sync_Egalitarian') or (trial.Condition == 'Sync_LF') or (trial.Condition == 'Sync_FL'):
-                        sync = True
+                        sync = True    
 
                     hierarchy = True
                     if (trial.Condition == 'Sync_Egalitarian') or (trial.Condition == 'Desync_Egalitarian'):
@@ -286,6 +286,13 @@ def get_all_trajectories():
                         hierarchy = False
                     else:
                         interactive = True
+
+                    if "LF" in trial.Condition:
+                        who_leader = 1
+                    elif "FL" in trial.Condition:
+                        who_leader = 2
+                    else:
+                        who_leader = 0
                     
                     CheckCount = 0
                     DesyncCount = 0
@@ -422,7 +429,7 @@ def get_all_trajectories():
                                        desync_crossings2[checkpoint+1] = index_1
                     
 
-                    new_row = {"group": group, "pair": pair.Pair, "order": 0, "interactive": interactive, "sync": sync, "hierarchy": hierarchy, "trial": trial.TrialNumber, "num_tries": num_tries,
+                    new_row = {"group": group, "pair": pair.Pair, "order": 0, "interactive": interactive, "sync": sync, "hierarchy": hierarchy, "who_leader": who_leader, "trial": trial.TrialNumber, "num_tries": num_tries,
                                             "completion_time": trial.CompletionTime, "phase1": full_phase1, "phase2": full_phase2, "sync_crossings1": sync_crossings1, "desync_crossings1": desync_crossings1,
                                                 "sync_crossings2": sync_crossings2, "desync_crossings2": desync_crossings2, "startindex": startindex, 
                                                 "KOP_100": KOP_100, "KOP_20": KOP_20, "PLV_100":PLV_100, "PLV_20": PLV_20}
@@ -446,7 +453,7 @@ with open(r"Behavioral_Dataframe.pickle", "rb") as input_file:
 
 
 # Filter out columns with unwanted data types and select specific columns
-filtered_columns = ['group', 'pair', 'order', 'interactive', 'sync', 'hierarchy', 'trial', 'num_tries', 'completion_time', 'KOP_100', 'KOP_20', 'PLV_100', 'PLV_20']
+filtered_columns = ['group', 'pair', 'order', 'interactive', 'sync', 'hierarchy', "who_leader", 'trial', 'num_tries', 'completion_time', 'KOP_100', 'KOP_20', 'PLV_100', 'PLV_20']
 
 # Write DataFrame to Excel file
 with pd.ExcelWriter("data_dictionary.xlsx") as writer:
