@@ -114,35 +114,35 @@ def extract_trials(events):
 
 
 
-def create_sub_epochs(trials, sfreq):
+def create_sub_epochs(trials, sfreq, window_size, step_size):
     """
     # create epochs with sliding windows with length 1 and sliding 0.5
     """
 
     events = np.empty(3,)
-    event_successes = np.empty(3,)
+    event_trialnumbers = np.empty(3,)
     for trial_index in range(np.size(trials,0)):
         trial_start = trials[trial_index, 0]
         trial_end = trials[trial_index, 1]
         condition = trials[trial_index, 3]
-        success = trials[trial_index, 4]
+        trialnumber= trials[trial_index, 4]
 
 
 
         epoch_start = trial_start 
-        while (epoch_start + sfreq ) < trial_end:
+        while (epoch_start + window_size * sfreq ) < trial_end:
             event = [epoch_start, 0, condition]
             events = np.vstack((events, np.array(event)))
             
-            event_success = [epoch_start, 0, success]
-            event_successes = np.vstack((event_successes, event_success))
+            event_trialnumbers = [epoch_start, 0, trialnumber]
+            event_trialnumbers = np.vstack((event_trialnumbers, event_trialnumbers))
 
             # sliding window with 0.5s interval
-            epoch_start += 0.5 * sfreq
+            epoch_start += step_size * sfreq
     events = (np.rint(events)).astype(int)
-    event_successes = (np.rint(event_successes)).astype(int)
+    event_trialnumbers = (np.rint(event_trialnumbers)).astype(int)
 
-    return events, event_successes
+    return events, event_trialnumbers
 
 
 def create_time_locked_epochs(trials, sfreq, old_events):
@@ -237,8 +237,160 @@ def create_time_locked_epochs(trials, sfreq, old_events):
 
     return events, event_info  
 
+def link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq):
+    """
+    only looks at successful trials
+    for each trial in the behavioral data, looks if there is a corresponding eeg trial and labels it with the corresponding trialnumber
+    eeg trials that did not find a match are labeled as nan
+    the 'labels' are stored in the fourth column of the updated_trials matrix
+    together with the condition number, these labels can then be used to link behavioral and eeg
+    """
 
 
+    successes = np.array(trials[:,4], dtype = int)
+    segments = trials[successes == 1,:]
+    #segments = segments[:,:2]
+    #new_trial = [trial_begin, trial_end, trial_counter, condition, success]
+    updated_trials = segments
+    updated_trials[:,4] = np.nan
+    #updated_trial = [trial_begin, trial_end, trial_counter, condition, trial_number]
+
+    event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
+
+    # get all data of the pair and then loop through the conditions
+    for key, value in event_id.items():
+        print(key)
+        condition_sements = segments[segments[:,3] == value]
+        if value in [2, 3, 4, 5]:
+            sync = True
+        else:
+            sync = False
+        
+        if value in [3, 4, 7, 8]:
+            hierarchy = True    
+        else:
+            hierarchy = False
+
+        if value == 5:
+            interactive = False
+        else:
+            interactive = True
+
+        if value in [3, 7]:
+            who_leader = 1
+        elif value in [4, 8]:
+            who_leader = 2
+        else:
+            who_leader = 0
+
+            # Filter rows based on conditions
+        filtered_data = data_dictionary[(data_dictionary['pair'] == pair) &
+                                        (data_dictionary['sync'] == sync) & 
+                                        (data_dictionary['hierarchy'] == hierarchy) & 
+                                        (data_dictionary['who_leader'] == who_leader) & 
+                                        (data_dictionary['interactive'] == interactive)]
+        
+        eeg_index = 0
+        fail_counter = 0
+        eeg_indices_for_trials = np.zeros((20,))
+        for trial in range(1, 21):
+            if np.size(condition_sements, 0) == eeg_index:
+                break  
+
+            # Iterate through each trial number
+            for index, row in filtered_data.iterrows():
+                # Check if the trial number matches the current trial in the loop
+                if int(row['trial']) == trial:
+                    # If a matching trial is found, print its completion time
+                    completion_time = np.min([len(row['phase2'])/100, len(row['phase1'])/100])
+                
+                    eeg_time = (condition_sements[eeg_index,1] - condition_sements[eeg_index,0])/sfreq
+            
+
+                    if value == 5:
+                        eeg_indices_for_trials[trial-1] = eeg_index
+                        #print(f" trial {trial} | behavioral: {completion_time} | EEG: {eeg_time}")
+                        continue
+
+                    if np.abs(eeg_time - completion_time) < 0.1:
+                        
+                        if eeg_index not in eeg_indices_for_trials:
+                            fail_counter = 0
+                            eeg_indices_for_trials[trial-1] = eeg_index
+                            #print(f" trial {trial} | behavioral: {completion_time} | EEG: {eeg_time}")
+                        else:
+                            eeg_indices_for_trials[trial-1] = np.nan
+                            #print(f" trial {trial} | behavioral: {completion_time} | EEG: {0}")
+                    else:
+                        # case when there is one eeg too many
+                        
+                        next_eeg_index = eeg_index+1
+                        if np.size(condition_sements, 0) == next_eeg_index:
+                            eeg_indices_for_trials[trial-1] = np.nan
+                            #print(f" trial {trial} | behavioral: {completion_time} | EEG: {0}")
+                            break
+                        next_eeg_time = (condition_sements[next_eeg_index,1] - condition_sements[next_eeg_index,0])/sfreq
+                        if np.abs(next_eeg_time - completion_time) < 0.1:
+                            eeg_indices_for_trials[trial-1] = next_eeg_index
+                            #print(f" trial {trial} | behavioral: {completion_time} | EEG: {next_eeg_time}")
+                        else:
+                            # case where there is no eeg for the behavioral data
+                            # go to next trial but keep current eeg index
+                            eeg_indices_for_trials[trial-1] = np.nan
+                            #print(f" trial {trial} | behavioral: {completion_time} | EEG: {0}")
+                            fail_counter+= 1
+                            if fail_counter < 2:
+                                eeg_index-=1                  
+
+                    
+            eeg_index+=1
+        #print(eeg_indices_for_trials)
+        # now we have the indices and we use them to find the trialcounter values that we wanted
+        # and then next to the trialcounter values in the original trials object we put the trialnumber values
+    
+        for i in range(1, 21):
+            eeg_index = eeg_indices_for_trials[i-1]
+            if not np.isnan(eeg_index):
+                trialcounter = condition_sements[int(eeg_index),2]
+                #print(trialcounter)
+                updated_trials[np.where(updated_trials[:,2] == trialcounter)[0],4] = i
+    return updated_trials
+
+
+
+def get_channels_to_reject(spliced_raw, events):
+     # set average reference
+    spliced_raw_reref = spliced_raw.copy()
+    spliced_raw_reref.set_eeg_reference(ref_channels='average', verbose = False)
+   
+    epochs = mne.Epochs(
+    spliced_raw_reref, events, event_id=None, tmin=0, tmax=3, baseline=None)
+
+   
+    channel_powers = []
+    psds, freqs = spliced_raw_reref.compute_psd(fmin = 1., fmax = 50., n_fft = 2048).get_data(return_freqs = True)
+    
+    for channel_index in range(64):
+        psd_channel = 10 * np.log10(psds[channel_index,:]*10**12)
+        average_power = np.mean(psd_channel)
+        channel_powers.append(average_power) # microvolt squared
+
+
+    
+    # detect channel powers that are too large
+    channel_powers = np.array(channel_powers)
+    rejected_channels_power = np.where((np.abs(channel_powers - np.mean(channel_powers)) > 3*np.std(channel_powers))) #np.where(channel_powers > 200) #np.where(np.abs(channel_powers - np.mean(channel_powers)) > 2*np.std(channel_powers))
+
+    rejected_channels = rejected_channels_power[0]
+
+
+    # mark those channels as bad in the raw object
+    
+   
+    del spliced_raw_reref 
+    del epochs
+
+    return rejected_channels
 
 def ICA_autocorrect(icas: list, epochs: list, verbose: bool = False) -> list:
     """
@@ -343,6 +495,7 @@ def AR_local_custom(cleaned_epochs_ICA: list, n_interpolates, consensus_percs, s
         # fitting AR to get bad epochs
         ar.fit(clean_epochs[:100])
         reject_log = ar.get_reject_log(clean_epochs, picks=picks)
+        reject_log.plot('horizontal')
         bad_epochs_AR.append(reject_log)
 
     # taking bad epochs for min 1 subj (dyad)
