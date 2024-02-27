@@ -9,10 +9,10 @@ import os
 import PyQt5
 import sys
 import pickle
-
+from openpyxl import load_workbook
 import autoreject
 from mne_icalabel import label_components
-
+import subprocess
 import copy
 import my_utils
 from my_utils import extract_trials, create_sub_epochs, AR_local_custom, ICA_autocorrect, AR_global_custom, link_eeg_to_behavioral_trials, get_channels_to_reject
@@ -22,7 +22,6 @@ path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1"
 raw_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\raw data"
 prep_path = os.path.join(path, "preprocessed data")
 log_path = os.path.join(path, "logs")
-
 
 
 # loop through all data files
@@ -40,6 +39,8 @@ for root, dirs, files in os.walk(raw_path):
 
             split_name = name.split("P")
             pair = int ((int(split_name[1]) + 1) / 2)
+
+       
 
             # read in data
             raw = mne.io.read_raw_bdf(file_path, preload = True)
@@ -84,19 +85,24 @@ for root, dirs, files in os.walk(raw_path):
             raw = mne.io.read_raw_bdf(file_path)
             events = mne.find_events(raw, shortest_event = 0)
             trials = extract_trials(events)
+
+            # only keep trials for which we found behavioral data
+            trials = trials[np.where(~np.isnan(trials[:,4]))[0],:]
             
             # link the eeg and behavioral data
             with open(r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\behavioral data\Behavioral_Dataframe.pickle", "rb") as input_file:
                 data_dictionary = pickle.load(input_file)
-            updated_trials = link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq)
+            sfreq = raw_1.info['sfreq']
 
-            # only keep trials for which we found behavioral data
-            updated_trials = updated_trials[np.where(~np.isnan(updated_trials[:,4]))[0],:]
+
+            #updated_trials = link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq)
+
+            updated_trials = trials
 
 
             # make epochs from trials
-            sfreq = raw_1.info['sfreq']
-            events, event_create_sub_epochs= create_sub_epochs(trials, sfreq, 2, 0.5)
+            
+            events, event_trialnumbers = create_sub_epochs(updated_trials, sfreq, 2, 0.5)
             print("fs" + str(raw.info['sfreq']))
             event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
 
@@ -104,7 +110,9 @@ for root, dirs, files in os.walk(raw_path):
             #new_trial = [trial_begin, trial_end, trial_counter, condition, trialnumber]
             segments = updated_trials[:,:2]
 
+            
             raws = [raw_1, raw_2]
+            """
             spliced_raws = []
             for raw_i in raws:
                 cropped_segments = []
@@ -123,13 +131,16 @@ for root, dirs, files in os.walk(raw_path):
                 # Concatenate the cropped segments back together
                 spliced_raw = mne.concatenate_raws(cropped_segments)
                 spliced_raws.append(spliced_raw)
-
+            """
+            spliced_raws = raws
             # reject very bad channels and then perform ICA:
             mappings = [mapping_1, mapping_2]
 
             raws_ICA_applied = []
             # interpolate bad channels but 
             map = 0
+            num_reject_channels = []
+            num_reject_components = []
             for spliced_raw in spliced_raws:
                 
                 # detect very bad channels
@@ -137,6 +148,7 @@ for root, dirs, files in os.walk(raw_path):
                 channel_names = list(mappings[map].values())
                 rejected_channel_names = [channel_names[i] for i in rejected_channels.tolist()]
                 channels_to_reject = rejected_channel_names
+                num_reject_channels.append(len(channels_to_reject))
 
                 # interpolate them
                 spliced_raw.info['bads'] = channels_to_reject
@@ -156,7 +168,9 @@ for root, dirs, files in os.walk(raw_path):
                 # reconstruct the data without the non-brain components
                 ica_with_labels_fitted = label_components(raw_copy, ica, method="iclabel")
                 ica_with_labels_component_detected = ica_with_labels_fitted["labels"]               
-                excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if label not in ["brain"]]
+                #excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if label not in ["brain"]]
+                excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if label in ["Eye", "Muscle"]]
+                num_reject_components.append(len(excluded_idx_components))
                 raw_ica_applied = ica.apply(raw_copy.copy(), exclude=excluded_idx_components)
 
 
@@ -170,7 +184,7 @@ for root, dirs, files in os.walk(raw_path):
 
             for raw in raws_ICA_applied:
                 epoch = mne.Epochs(raw, events, event_id, event_repeated = 'drop', on_missing = 'ignore', tmin=0, tmax=2, preload=True, baseline=(0, 0))
-
+                epochs.append(epoch)
 
             n_interpolates = np.array([1, 2, 3, 4])
             consensus_percs = None
@@ -185,3 +199,36 @@ for root, dirs, files in os.walk(raw_path):
             storepath = os.path.join(prep_path,"pair_" + str(pair))
             with open(storepath, "wb") as output_file:
                 pickle.dump(cleaned_epochs_AR, output_file, protocol=pickle.HIGHEST_PROTOCOL)
+
+            # Path to your Excel file
+            file_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\preprocessing_log.xlsx"
+            # write line for first participant:
+            for i in range(2):
+                participant = 2*pair-1+i
+                # Read the existing Excel file into a DataFrame
+
+                percentage_bads = dic_AR['dyad']
+                # The row number where you want to insert the new data (e.g., 5th row)
+                target_row_number = participant+1
+
+                # Load the existing workbook
+                wb = load_workbook(file_path)
+
+                # Select the active worksheet or a specific sheet
+                ws = wb.active
+
+                # Insert a new row (if you want to make space without overwriting existing data)
+                ws.insert_rows(target_row_number)
+
+                # Split your comma-separated string into values
+                values = [pair, participant, num_reject_channels[i], num_reject_components[i], percentage_bads]
+
+                # Assign values to each cell in the target row
+                for col_index, value in enumerate(values, start=1):  # Starting index is 1 since Excel columns start from 1
+                    ws.cell(row=target_row_number, column=col_index, value=value)
+
+                # Save the workbook
+                wb.save(file_path)
+
+# Code to run script2.py at the end of script1.py
+subprocess.run(["python", "frequency_calculation.py"])

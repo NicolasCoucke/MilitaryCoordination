@@ -260,7 +260,13 @@ def link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq):
     # get all data of the pair and then loop through the conditions
     for key, value in event_id.items():
         print(key)
+       
         condition_sements = segments[segments[:,3] == value]
+        
+
+        if np.size(condition_sements, 0) == 0:
+            break
+
         if value in [2, 3, 4, 5]:
             sync = True
         else:
@@ -354,6 +360,7 @@ def link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq):
                 trialcounter = condition_sements[int(eeg_index),2]
                 #print(trialcounter)
                 updated_trials[np.where(updated_trials[:,2] == trialcounter)[0],4] = i
+
     return updated_trials
 
 
@@ -495,7 +502,8 @@ def AR_local_custom(cleaned_epochs_ICA: list, n_interpolates, consensus_percs, s
         # fitting AR to get bad epochs
         ar.fit(clean_epochs[:100])
         reject_log = ar.get_reject_log(clean_epochs, picks=picks)
-        reject_log.plot('horizontal')
+        #reject_log.plot('horizontal')
+        #clean_epochs[reject_log.bad_epochs].plot(scalings=dict(eeg=100e-6))
         bad_epochs_AR.append(reject_log)
 
     # taking bad epochs for min 1 subj (dyad)
@@ -528,8 +536,12 @@ def AR_local_custom(cleaned_epochs_ICA: list, n_interpolates, consensus_percs, s
         clean_epochs_ep = clean_epochs_ep.drop(indices=bad)
         # interpolating bads or removing epochs
         ar = AR[cleaned_epochs_ICA.index(clean_epochs)]
+      #  print('len unprocessed epochs' + len(clean_epochs_AR))
         clean_epochs_AR = ar.transform(clean_epochs_ep)
+     #   print('len epochs' + len(clean_epochs_AR))
         cleaned_epochs_AR.append(clean_epochs_AR)
+
+        
 
 
     if strategy == 'intersection':
@@ -931,6 +943,8 @@ def compute_freq_bands(data: np.ndarray, sampling_rate: int, freq_bands: dict, *
         freq_bands:
             a dictionary specifying frequency band labels and corresponding frequency ranges
             e.g. {'alpha':[8,12],'beta':[12,20]} indicates that computations are performed over two frequency bands: 8-12 Hz for the alpha band and 12-20 Hz for the beta band.
+        enveloppe: 
+            should we 
         **filter_options:
             additional arguments for mne.filter.filter_data, such as filter_length, l_trans_bandwidth, h_trans_bandwidth
     Returns:
