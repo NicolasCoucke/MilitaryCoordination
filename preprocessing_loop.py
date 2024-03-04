@@ -40,17 +40,26 @@ for root, dirs, files in os.walk(raw_path):
             split_name = name.split("P")
             pair = int ((int(split_name[1]) + 1) / 2)
 
-       
+            prep_filename = "".join(['pair_', str(pair)])
+            # if the file already exists then not make it again
+            continue_bool = False
+            for root, dirs, files in os.walk(prep_path):
+                if prep_filename in files:
+                    continue_bool = True
+            if continue_bool:
+                continue
 
             # read in data
             raw = mne.io.read_raw_bdf(file_path, preload = True)
-            channels_1 = raw.info.ch_names[:64]
-            raw_1 = raw.pick_channels(channels_1)
-            del raw
-            raw = mne.io.read_raw_bdf(file_path, preload = True)
-            channels_2 = raw.info.ch_names[76:140]
+            channels_2 = raw.info.ch_names[:64]
             raw_2 = raw.pick_channels(channels_2)
             del raw
+            raw = mne.io.read_raw_bdf(file_path, preload = True)
+            channels_1 = raw.info.ch_names[76:140]
+            raw_1 = raw.pick_channels(channels_1)
+            del raw
+
+            # note: we switch it up since in our setup, BOX1 in the eeg data is player 2 in the behavioral data
 
             # get the montage that we will use
             biosemi64_montage = mne.channels.make_standard_montage('biosemi64')
@@ -96,13 +105,12 @@ for root, dirs, files in os.walk(raw_path):
 
 
             #updated_trials = link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq)
-
             updated_trials = trials
 
 
             # make epochs from trials
             
-            events, event_trialnumbers = create_sub_epochs(updated_trials, sfreq, 2, 0.5)
+            events, event_trialnumbers = create_sub_epochs(updated_trials, sfreq, 2, 1)
             print("fs" + str(raw.info['sfreq']))
             event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
 
@@ -159,17 +167,22 @@ for root, dirs, files in os.walk(raw_path):
      
                 
                 # Create a copy of the raw data and remove the interpolated channels from the copy
-                raw_copy = spliced_raw.copy().drop_channels(channels_to_reject)
+                #raw_copy = spliced_raw.copy().drop_channels(channels_to_reject)
+                raw_copy = spliced_raw
+                # skipped the above step because bad channels are excluded from ica anyway
 
                 # Perform ICA on the copy without the interpolated channels
-                ica = mne.preprocessing.ICA(n_components=20, random_state=97, max_iter=800)
+                ica = mne.preprocessing.ICA(n_components=35, random_state=97, max_iter=800)
                 ica.fit(raw_copy)
 
                 # reconstruct the data without the non-brain components
                 ica_with_labels_fitted = label_components(raw_copy, ica, method="iclabel")
-                ica_with_labels_component_detected = ica_with_labels_fitted["labels"]               
+                ica_with_labels_component_detected = ica_with_labels_fitted["labels"]          
+                #print(ica_with_labels_component_detected)
+                ica_with_labels_probabilities = ica_with_labels_fitted["y_pred_proba"] 
+                #print(ica_with_labels_probabilities)        
                 #excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if label not in ["brain"]]
-                excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if label in ["Eye", "Muscle"]]
+                excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if ((label in ["eye blink", "muscle artifact"]) and  (ica_with_labels_probabilities[idx] > 0.9))]
                 num_reject_components.append(len(excluded_idx_components))
                 raw_ica_applied = ica.apply(raw_copy.copy(), exclude=excluded_idx_components)
 
@@ -231,4 +244,14 @@ for root, dirs, files in os.walk(raw_path):
                 wb.save(file_path)
 
 # Code to run script2.py at the end of script1.py
-subprocess.run(["python", "frequency_calculation.py"])
+try:
+    subprocess.run(["python", "power_per_participant.py"])
+except:
+    print('continue')
+
+try:
+    subprocess.run(["python", "homologous_coupling.py"])
+except:
+    print('continue')
+
+subprocess.run(["python", "time_locked_preprocessing_loop.py"])

@@ -31,7 +31,7 @@ log_path = os.path.join(path, "logs")
 pair = 1
 for root, dirs, files in os.walk(prep_path):
     for name in files:
-        if 'pair' in name:
+        if ('pair' in name) and ('freq' not in name):
             print("processing file " + name)
 
             file_path = os.path.join(prep_path, name)
@@ -40,6 +40,9 @@ for root, dirs, files in os.walk(prep_path):
             
             split_name = name.split("_")
             pair = int(split_name[1])
+
+            #if pair != 6:
+            #    continue
 
 
             with open(file_path,"rb") as input_file:
@@ -62,5 +65,5 @@ for root, dirs, files in os.walk(prep_path):
             combined_bad_epochs = list(set(bad_epochs_0 + bad_epochs_1))
 
             # Step 4: Reject bad epochs from both Epochs objects
-            cleaned_epochs_AR[0].drop(indices=combined_bad_epochs, reason='manual rejection', verbose=True)
-            cleaned_epochs_AR[1].drop(indices=combined_bad_epochs, reason='manual rejection', verbose=True)
+           # cleaned_epochs_AR[0].drop(indices=combined_bad_epochs, reason='manual rejection', verbose=True)
+            #cleaned_epochs_AR[1].drop(indices=combined_bad_epochs, reason='manual rejection', verbose=True)

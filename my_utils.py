@@ -148,28 +148,32 @@ def create_sub_epochs(trials, sfreq, window_size, step_size):
 def create_time_locked_epochs(trials, sfreq, old_events):
     event_values = old_events[:, 2]
     event_samples = old_events[:,0]
-    events = np.empty(3,)
-    event_info = np.empty(3,) # (trial number, successful, baseline)
+    events = np.zeros((3,))
+    event_info = np.zeros((3,)) # (trial number, successful, baseline)
     for trial_index in range(np.size(trials,0)):
         trial_start = trials[trial_index, 0]
         trial_end = trials[trial_index, 1]
         condition = trials[trial_index, 3]
         success = trials[trial_index, 4]
 
+        """
         # first add the baseline (start of trial)
         event = [trial_start, 0, condition]
         events = np.vstack((events, np.array(event)))
         info = [trial_index, 0, 1]
         event_info = np.vstack((event_info, info))
+        """
 
         # find the events happening within this trial
         trial_events = np.where((trial_start < event_samples) & (trial_end > event_samples))[0]
-
         
+        
+        previous_event = 0
 
         if condition in [2, 3, 4, 5]:
             # find the first cross of the checkpoint
             crossed_points = []
+            
             for trial_event in trial_events:
                 event_value = str(event_values[trial_event])
                     
@@ -178,26 +182,30 @@ def create_time_locked_epochs(trials, sfreq, old_events):
                     
                 player_crossed = int(event_value[0:2])
                 checkpoint = int(event_value[2])
-              
+
+
                 if ((player_crossed == 21) or (player_crossed == 11)) and (checkpoint not in crossed_points):
                     # add checkpoint to list
 
                     event_sample = event_samples[trial_event]
                     # only add the event when the last one was not less than 500ms before so as to not mix them too much
-                    if (event_sample - events[-1, 0]) > 0.5*sfreq:
+                    if (event_sample - previous_event) > 0.5*sfreq:
                         event = [event_sample, 0, condition]
                         events = np.vstack((events, np.array(event)))
                         info = [trial_index, 1, 0]
                         event_info = np.vstack((event_info, info))
                         crossed_points.append(checkpoint)
+                        previous_event = event_sample
 
-                    # or if they are game over
+                    # or if they are game over (i.e., failure)
                 elif ((player_crossed == 24) or (player_crossed == 14)):
                     event_sample = event_samples[trial_event]
                     event = [event_sample, 0, condition]
                     events = np.vstack((events, np.array(event)))
                     info = [trial_index, 0, 0]
                     event_info = np.vstack((event_info, info))
+
+                
 
 
         elif condition in [6,7,8]:
@@ -215,17 +223,21 @@ def create_time_locked_epochs(trials, sfreq, old_events):
                 # only for desync points
                 if ((player_crossed == 20) or (player_crossed == 10)) and (checkpoint not in crossed_points):
                     # add checkpoint to list
-                    event_sample = event_samples[trial_event]
-                    event = [event_sample, 0, condition]
+                    if (event_sample - previous_event) > 0.5*sfreq:
+                        event_sample = event_samples[trial_event]
+                        event = [event_sample, 0, condition]
+                        events = np.vstack((events, np.array(event)))
 
-                    info = [trial_index, 1, 0]
-                    event_info = np.vstack((event_info, info))
-                    crossed_points.append(checkpoint)
+                        info = [trial_index, 1, 0]
+                        event_info = np.vstack((event_info, info))
+                        crossed_points.append(checkpoint)
+                        previous_event = event_sample
 
                 # or if they are game over
                 elif ((player_crossed == 24) or (player_crossed == 14)):
                     event_sample = event_samples[trial_event]
                     event = [event_sample, 0, condition]
+                    events = np.vstack((events, np.array(event)))
 
                     info = [trial_index, 0, 0]
                     event_info = np.vstack((event_info, info))
@@ -234,6 +246,9 @@ def create_time_locked_epochs(trials, sfreq, old_events):
        
     events = (np.rint(events)).astype(int)
     event_info = (np.rint(event_info)).astype(int)
+
+    events = events[1:,:]
+    event_info = event_info[1:,:]
 
     return events, event_info  
 
@@ -369,11 +384,7 @@ def get_channels_to_reject(spliced_raw, events):
      # set average reference
     spliced_raw_reref = spliced_raw.copy()
     spliced_raw_reref.set_eeg_reference(ref_channels='average', verbose = False)
-   
-    epochs = mne.Epochs(
-    spliced_raw_reref, events, event_id=None, tmin=0, tmax=3, baseline=None)
-
-   
+      
     channel_powers = []
     psds, freqs = spliced_raw_reref.compute_psd(fmin = 1., fmax = 50., n_fft = 2048).get_data(return_freqs = True)
     
@@ -395,8 +406,7 @@ def get_channels_to_reject(spliced_raw, events):
     
    
     del spliced_raw_reref 
-    del epochs
-
+   
     return rejected_channels
 
 def ICA_autocorrect(icas: list, epochs: list, verbose: bool = False) -> list:
@@ -500,7 +510,7 @@ def AR_local_custom(cleaned_epochs_ICA: list, n_interpolates, consensus_percs, s
         AR.append(ar)
 
         # fitting AR to get bad epochs
-        ar.fit(clean_epochs[:100])
+        ar.fit(clean_epochs[:250])
         reject_log = ar.get_reject_log(clean_epochs, picks=picks)
         #reject_log.plot('horizontal')
         #clean_epochs[reject_log.bad_epochs].plot(scalings=dict(eeg=100e-6))
@@ -967,7 +977,7 @@ def compute_freq_bands(data: np.ndarray, sampling_rate: int, freq_bands: dict, *
         # first reshape the array so that the dimension of the epochs is merged with that of time
         # then use the length of the time dimension to take return it into epochs (use np.reshape) 
         
-
+        print('filter_action')
 
         filtered = np.array([mne.filter.filter_data(data[participant],
                                                     sampling_rate, l_freq=freq_band[0], h_freq=freq_band[1],
@@ -987,6 +997,81 @@ def compute_freq_bands(data: np.ndarray, sampling_rate: int, freq_bands: dict, *
     return complex_signal
 
 
+
+def compute_freq_bands_memory_saving(data: np.ndarray, sampling_rate: int, freq_bands: dict, **filter_options) -> np.ndarray:
+    """
+    Computes analytic signal per frequency band using FIR filtering
+    and Hilbert transform.
+
+    Arguments:
+        data:
+            shape is (2, n_epochs, n_channels, n_times)
+            real-valued data to compute analytic signal from.
+        sampling_rate:
+            sampling rate.
+        freq_bands:
+            a dictionary specifying frequency band labels and corresponding frequency ranges
+            e.g. {'alpha':[8,12],'beta':[12,20]} indicates that computations are performed over two frequency bands: 8-12 Hz for the alpha band and 12-20 Hz for the beta band.
+        enveloppe: 
+            should we 
+        **filter_options:
+            additional arguments for mne.filter.filter_data, such as filter_length, l_trans_bandwidth, h_trans_bandwidth
+    Returns:
+        complex_signal: array, shape is
+            (2, n_epochs, n_channels, n_freq_bands, n_times)
+    """
+    assert data[0].shape[0] == data[1].shape[0], "Two data streams should have the same number of trials."
+    data = np.array(data)
+
+    n_freq_bands = len(freq_bands.keys())
+    n_epochs = data.shape[1]
+    n_ch = data.shape[2]
+    n_times = data.shape[3]
+    # first transform the data so that you all epochs are concatenated
+    data = np.reshape(data, (2, n_ch, n_epochs * n_times))
+
+    segment_length = 50000  # Define a suitable segment length (number of time points)
+    n_segments = (n_epochs * n_times) // segment_length  # Calculate the number of segments needed
+
+
+    # filtering and hilbert transform
+    complex_signal = []
+    for freq_band in freq_bands.values():
+        # first reshape the array so that the dimension of the epochs is merged with that of time
+        # then use the length of the time dimension to take return it into epochs (use np.reshape) 
+        processed_segments = []
+    
+        for segment_idx in range(n_segments + 1):  # +1 to include the last segment which might be shorter
+            start_idx = segment_idx * segment_length
+            end_idx = start_idx + segment_length
+            if end_idx > n_epochs * n_times:
+                end_idx = n_epochs * n_times  # Ensure we don't go beyond the data
+            
+            # Segment the data
+            data_segment = data[:, :, start_idx:end_idx]
+            
+            # Filter and Hilbert transform the segmented data
+            filtered_segment = np.array([
+                mne.filter.filter_data(data_segment[participant], sampling_rate, 
+                                    l_freq=freq_band[0], h_freq=freq_band[1],
+                                    **filter_options, verbose=False)
+                for participant in range(2)  # For each participant
+            ])
+            
+            hilb_segment = signal.hilbert(filtered_segment, axis=-1)  # Apply the Hilbert transform along the time axis
+            
+            processed_segments.append(hilb_segment)
+
+         # Concatenate the processed segments back together
+    full_processed_signal = np.concatenate(processed_segments, axis=-1)
+    complex_signal.append(full_processed_signal)
+
+    complex_signal = np.moveaxis(np.array(complex_signal), [0], [3])
+
+    # now split the data up back into the epochs
+    complex_signal = np.reshape(complex_signal, (2, n_epochs, n_ch, n_freq_bands, n_times))
+
+    return complex_signal
 
 
 def define_event_dictionary():
