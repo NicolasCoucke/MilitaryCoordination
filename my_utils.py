@@ -510,7 +510,7 @@ def AR_local_custom(cleaned_epochs_ICA: list, n_interpolates, consensus_percs, s
         AR.append(ar)
 
         # fitting AR to get bad epochs
-        ar.fit(clean_epochs[:250])
+        ar.fit(clean_epochs)
         reject_log = ar.get_reject_log(clean_epochs, picks=picks)
         #reject_log.plot('horizontal')
         #clean_epochs[reject_log.bad_epochs].plot(scalings=dict(eeg=100e-6))

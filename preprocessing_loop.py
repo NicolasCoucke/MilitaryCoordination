@@ -96,16 +96,22 @@ for root, dirs, files in os.walk(raw_path):
             trials = extract_trials(events)
 
             # only keep trials for which we found behavioral data
-            trials = trials[np.where(~np.isnan(trials[:,4]))[0],:]
+            #trials = trials[np.where(~np.isnan(trials[:,4]))[0],:]
             
             # link the eeg and behavioral data
             with open(r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\behavioral data\Behavioral_Dataframe.pickle", "rb") as input_file:
                 data_dictionary = pickle.load(input_file)
             sfreq = raw_1.info['sfreq']
 
+            # only get successful trials
+            successes = np.array(trials[:,4], dtype = int)
+            segments = trials[successes == 1,:]
+            #segments = segments[:,:2]
+            #new_trial = [trial_begin, trial_end, trial_counter, condition, success]
+            updated_trials = segments
 
             #updated_trials = link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq)
-            updated_trials = trials
+            #updated_trials = trials
 
 
             # make epochs from trials
@@ -181,8 +187,8 @@ for root, dirs, files in os.walk(raw_path):
                 #print(ica_with_labels_component_detected)
                 ica_with_labels_probabilities = ica_with_labels_fitted["y_pred_proba"] 
                 #print(ica_with_labels_probabilities)        
-                #excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if label not in ["brain"]]
-                excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if ((label in ["eye blink", "muscle artifact"]) and  (ica_with_labels_probabilities[idx] > 0.9))]
+                excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if (label not in ["brain"] and  (ica_with_labels_probabilities[idx] > 0.9))]
+                #excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if ((label in ["eye blink", "muscle artifact"]) and  (ica_with_labels_probabilities[idx] > 0.9))]
                 num_reject_components.append(len(excluded_idx_components))
                 raw_ica_applied = ica.apply(raw_copy.copy(), exclude=excluded_idx_components)
 
@@ -199,8 +205,8 @@ for root, dirs, files in os.walk(raw_path):
                 epoch = mne.Epochs(raw, events, event_id, event_repeated = 'drop', on_missing = 'ignore', tmin=0, tmax=2, preload=True, baseline=(0, 0))
                 epochs.append(epoch)
 
-            n_interpolates = np.array([1, 2, 3, 4])
-            consensus_percs = None
+            n_interpolates = np.array([1, 4, 32])
+            consensus_percs = np.linspace(0, 1.0, 11)
 
             cleaned_epochs_AR, dic_AR, bad_epochs_AR  = AR_local_custom(epochs, n_interpolates, consensus_percs,
                                                     strategy="union",

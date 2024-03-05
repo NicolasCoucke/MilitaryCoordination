@@ -170,8 +170,8 @@ for root, dirs, files in os.walk(raw_path):
                 #print(ica_with_labels_component_detected)
                 ica_with_labels_probabilities = ica_with_labels_fitted["y_pred_proba"] 
                 #print(ica_with_labels_probabilities)        
-                #excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if label not in ["brain"]]
-                excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if ((label in ["eye blink", "muscle artifact"]) and  (ica_with_labels_probabilities[idx] > 0.9))]
+                excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if (label not in ["brain"] and  (ica_with_labels_probabilities[idx] > 0.9))]
+                #excluded_idx_components = [idx for idx, label in enumerate(ica_with_labels_component_detected) if ((label in ["eye blink", "muscle artifact"]) and  (ica_with_labels_probabilities[idx] > 0.9))]
                 num_reject_components.append(len(excluded_idx_components))
                 raw_ica_applied = ica.apply(raw_copy.copy(), exclude=excluded_idx_components)
 

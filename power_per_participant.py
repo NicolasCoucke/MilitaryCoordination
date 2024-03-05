@@ -105,10 +105,12 @@ for root, dirs, files in os.walk(prep_path):
                     #    data_1
 
                     data_inter = np.array([preproc_S1[condition], preproc_S2[condition]])
-                    del data_inter
+                    
                     complex_signal = compute_freq_bands(data_inter, 512, freq_bands)
-                    del complex_signal
+                    del data_inter
+                    
                     pair_complex_signal_dict[condition] = complex_signal
+                    #del complex_signal
                 else:
                     # if there are no epochs for the condition, just continue
                     continue
@@ -233,10 +235,10 @@ for root, dirs, files in os.walk(prep_path):
                     X = signal_1
                     Y = signal_2
 
-                    n_epochs = X.shape[0]
+                   # n_epochs = X.shape[0]
                     n_channels = n_ch
-                    n_frequency_bands = X.shape[2]
-                    n_times = X.shape[3]
+                    n_frequency_bands = len(freq_bands.keys())#X.shape[2]
+                    #n_times = X.shape[3]
 
                     # Initialize an array to hold the PPC values for each epoch, channel, and frequency band
                     ppc = np.zeros((n_epochs, n_channels, n_frequency_bands))
