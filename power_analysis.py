@@ -31,7 +31,7 @@ from hypyp import prep
 from hypyp import stats
 from hypyp import viz
 """
-connectivity_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\connectivity data"
+connectivity_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\time locked connectivity"
 # loop through all data files
 individual_stack = np.zeros((64,5))
 sync_egal_stack = np.zeros((64,5))
@@ -54,14 +54,14 @@ for root, dirs, files in os.walk(connectivity_path):
             split_name = name.split("pair")
             pair = int(split_name[1])
 
-            if pair < 15:
-                continue
+           # if pair < 15:
+            #    continue
 
             with open(file_path,"rb") as input_file:
                 participant_1_power_values, participant_2_power_values = pickle.load(input_file)
 
-            
-
+            #print(participant_1_power_values)
+            print(participant_2_power_values.keys())
 
             for participant_power_values in [participant_1_power_values, participant_2_power_values]:
                 #print(participant_power_values )
@@ -77,11 +77,10 @@ for root, dirs, files in os.walk(connectivity_path):
                 # select condition and frequency band
                 event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
                 print(pair)
-                print(participant_power_values.keys())
-                print(len(participant_power_values.keys()))
 
-                if len(participant_power_values.keys()) != 7:
-                    continue
+
+                #if len(participant_power_values.keys()) != 7:
+                 #   continue
 
           
                 print(np.shape(participant_power_values['Individual']))
@@ -92,7 +91,7 @@ for root, dirs, files in os.walk(connectivity_path):
                 complementary_sync_egal_stack = np.dstack((complementary_sync_egal_stack , participant_power_values['Complementary/Egalitarian']))
                 complementary_leader_stack = np.dstack((complementary_leader_stack , participant_power_values['Complementary/Leader']))
                 complementary_follower_stack = np.dstack((complementary_follower_stack , participant_power_values['Complementary/Follower']))
-           
+#print(individual_stack)
 individual_stack = individual_stack[:,:,1:]
 sync_egal_stack = sync_egal_stack[:,:,1:]
 leader_stack = leader_stack[:,:,1:]
@@ -103,7 +102,7 @@ complementary_follower_stack = complementary_follower_stack[:,:,1:]
 
 # Define the number of contrasts and frequency bands for your grid layout
 num_contrasts = 4
-num_freq_bands = 4  # Example: Theta, Alpha, Beta, Gamma
+num_freq_bands = 5  # Example: Theta, Alpha, Beta, Gamma
 # get the montage that we will use
 biosemi64_montage = mne.channels.make_standard_montage('biosemi64')
 
@@ -211,7 +210,7 @@ for contrast_idx in range(num_contrasts):
         significant_clusters = cluster_p_values < significance_level
 
         # Define significance level
-        significance_level = 0.10
+        #significance_level = 0.10
 
         # Initialize a mask with False (indicating no significance)
         mask = np.zeros((64,), dtype=bool)  # data.shape[1] is n_channels

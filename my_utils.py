@@ -512,6 +512,7 @@ def AR_local_custom(cleaned_epochs_ICA: list, n_interpolates, consensus_percs, s
         # fitting AR to get bad epochs
         ar.fit(clean_epochs)
         reject_log = ar.get_reject_log(clean_epochs, picks=picks)
+        #ar.get_reject_log(clean_epochs).plot()
         #reject_log.plot('horizontal')
         #clean_epochs[reject_log.bad_epochs].plot(scalings=dict(eeg=100e-6))
         bad_epochs_AR.append(reject_log)
@@ -550,6 +551,7 @@ def AR_local_custom(cleaned_epochs_ICA: list, n_interpolates, consensus_percs, s
         clean_epochs_AR = ar.transform(clean_epochs_ep)
      #   print('len epochs' + len(clean_epochs_AR))
         cleaned_epochs_AR.append(clean_epochs_AR)
+        
 
         
 
@@ -560,7 +562,8 @@ def AR_local_custom(cleaned_epochs_ICA: list, n_interpolates, consensus_percs, s
 
     dic_AR['dyad'] = float(((len(cleaned_epochs_ICA[0])-len(cleaned_epochs_AR[0]))/len(cleaned_epochs_ICA[0]))*100)
     if dic_AR['dyad'] >= threshold:
-        TypeError('percentage of rejected epochs above threshold!')
+        print('percentage of rejected epochs above threshold!')
+        #TypeError('percentage of rejected epochs above threshold!')
     if verbose:
         print('%s percent of bad epochs' % dic_AR['dyad'])
 
@@ -969,7 +972,7 @@ def compute_freq_bands(data: np.ndarray, sampling_rate: int, freq_bands: dict, *
     n_ch = data.shape[2]
     n_times = data.shape[3]
     # first transform the data so that you all epochs are concatenated
-    data = np.reshape(data, (2, n_ch, n_epochs * n_times))
+    #data = np.reshape(data, (2, n_ch, n_epochs * n_times))
 
     # filtering and hilbert transform
     complex_signal = []
@@ -992,7 +995,7 @@ def compute_freq_bands(data: np.ndarray, sampling_rate: int, freq_bands: dict, *
     complex_signal = np.moveaxis(np.array(complex_signal), [0], [3])
 
     # now split the data up back into the epochs
-    complex_signal = np.reshape(complex_signal, (2, n_epochs, n_ch, n_freq_bands, n_times))
+    #complex_signal = np.reshape(complex_signal, (2, n_epochs, n_ch, n_freq_bands, n_times))
 
     return complex_signal
 

@@ -24,6 +24,7 @@ import copy
 import pickle
 import os
 from my_utils import compute_freq_bands, compute_freq_bands_memory_saving
+from stat_utils import get_two_way_channel_clusters, plot_two_way_channel_clusters
 #import statsmodels.api as sm
 import autoreject
 #from statsmodels.formula.api import ols
@@ -40,8 +41,15 @@ freq_bands = {
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1"
 raw_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\raw data"
 prep_path = os.path.join(path, "preprocessed data")
+
 log_path = os.path.join(path, "logs")
 
+from scipy.signal import filtfilt, butter
+
+# Create a low-pass filter
+nyquist = 0.5 * 512  # Nyquist frequency
+cutoff_frequency = 10  # Desired cutoff frequency in Hz
+b, a = butter(4, cutoff_frequency / nyquist)
 
 
 # loop through all data files
@@ -62,7 +70,9 @@ for root, dirs, files in os.walk(prep_path):
             with open(file_path,"rb") as input_file:
                 cleaned_epochs_AR = pickle.load(input_file)
 
+            
             connectivity_path = os.path.join(path, "connectivity data")
+            #connectivity_path = os.path.join(path, "connectivity data")
             prep_filename = "".join(['individual_power_pair', str(pair)])
             # if the file already exists then not make it again
             continue_bool = False
@@ -89,16 +99,23 @@ for root, dirs, files in os.walk(prep_path):
             event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
             pair_complex_signal_dict = {}
 
+            #print(list(preproc_S1.event_id.keys()))
+            #event_id = preproc_S1.event_id
+
             
+
+                
             # calculate the complex signal (hilbert) for each frequency band 
             print('calculate complex signal for all conditions')
             for condition in event_id.keys():
-
-                # find the epoch positions of this condition
-                epoch_positions = np.where(preproc_S1.events[:,2] == event_id[condition])
-
+                
 
                 if event_id[condition] in preproc_S1.events[:,2]:
+                    # find the epoch positions of this condition
+                    epoch_positions = np.where(preproc_S1.events[:,2] == event_id[condition])
+
+
+               
 
                     # to ensure that there are not too many epoehcs (which makes it crash), we will randomly select 200 epochs in case there are more than 200
                    # if len(epoch_positions) > 200:
@@ -160,7 +177,7 @@ for root, dirs, files in os.walk(prep_path):
                     participant_1_power_values[condition] = average_powers_1
                     participant_2_power_values[condition] = average_powers_2
 
-            storepath = os.path.join(path, "connectivity data", 'individual_power_pair'+ str(pair))
+            storepath = os.path.join(connectivity_path, 'individual_power_pair'+ str(pair))
             with open(storepath, "wb") as output_file: 
                 pickle.dump([participant_1_power_values, participant_2_power_values], output_file, protocol=pickle.HIGHEST_PROTOCOL)    
 
@@ -255,12 +272,17 @@ for root, dirs, files in os.walk(prep_path):
                                     Y_coeff = Y[epoch, channel, frequency_band, :]
                                 
                                 # Compute the orthogonal projections
-                                Y_proj_on_X = (np.imag(Y_coeff) * np.conj(X_coeff)) / np.abs(X_coeff)
-                                X_proj_on_Y = (np.imag(X_coeff) * np.conj(Y_coeff)) / np.abs(Y_coeff)
+                                Y_proj_on_X = np.imag((Y_coeff) * np.conj(X_coeff) / np.abs(X_coeff))
+                                X_proj_on_Y = np.imag((X_coeff) * np.conj(Y_coeff) / np.abs(Y_coeff))
+
                                 
                                 Y_orthogonal = np.abs(Y_proj_on_X)
                                 X_orthogonal = np.abs(X_proj_on_Y)
-                                
+                                # Apply the filter to the amplitude envelope
+                                Y_orthogonal = filtfilt(b, a, Y_orthogonal)
+                                X_orthogonal = filtfilt(b, a, X_orthogonal)
+
+
                                 # Compute correlation between the magnitudes of the orthogonal projections
                                 if np.std(Y_orthogonal) * np.std(X_orthogonal) != 0:  # Avoid division by zero
                                     ppc_value = np.corrcoef(Y_orthogonal, X_orthogonal)[0, 1]
@@ -309,6 +331,6 @@ for root, dirs, files in os.walk(prep_path):
                 pair_imcoh_values.append(participant_imcoh_values)
                 pair_ppc_values.append(participant_ppc_values)
 
-            storepath = os.path.join(path, "connectivity data", 'many_to_one_pair_'+ str(pair))
+            storepath = os.path.join(connectivity_path, 'many_to_one_pair_'+ str(pair))
             with open(storepath, "wb") as output_file: 
                 pickle.dump([pair_imcoh_values, pair_ppc_values], output_file, protocol=pickle.HIGHEST_PROTOCOL)

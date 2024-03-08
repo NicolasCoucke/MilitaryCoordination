@@ -95,6 +95,7 @@ for root, dirs, files in os.walk(raw_path):
             events = mne.find_events(raw, shortest_event = 0)
             trials = extract_trials(events)
 
+            print('trialshape ' + str(np.shape(trials)))
             # only keep trials for which we found behavioral data
             #trials = trials[np.where(~np.isnan(trials[:,4]))[0],:]
             
@@ -109,7 +110,7 @@ for root, dirs, files in os.walk(raw_path):
             #segments = segments[:,:2]
             #new_trial = [trial_begin, trial_end, trial_counter, condition, success]
             updated_trials = segments
-
+            print('updated_trialshape ' + str(np.shape(updated_trials)))
             #updated_trials = link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq)
             #updated_trials = trials
 
@@ -198,15 +199,19 @@ for root, dirs, files in os.walk(raw_path):
                 raws_ICA_applied.append(raw_ica_applied)
                 map+=1
 
-            # now epoch the data and perform autoreject        
+            # now epoch the data, reasample, and perform autoreject        
             epochs = []
 
             for raw in raws_ICA_applied:
                 epoch = mne.Epochs(raw, events, event_id, event_repeated = 'drop', on_missing = 'ignore', tmin=0, tmax=2, preload=True, baseline=(0, 0))
+                epoch.resample(sfreq=512)
                 epochs.append(epoch)
 
-            n_interpolates = np.array([1, 4, 32])
-            consensus_percs = np.linspace(0, 1.0, 11)
+
+            
+
+            n_interpolates = np.array([1, 2, 4, 6])
+            consensus_percs = np.linspace(0, 0.2, 5)
 
             cleaned_epochs_AR, dic_AR, bad_epochs_AR  = AR_local_custom(epochs, n_interpolates, consensus_percs,
                                                     strategy="union",
@@ -249,6 +254,10 @@ for root, dirs, files in os.walk(raw_path):
                 # Save the workbook
                 wb.save(file_path)
 
+
+
+
+
 # Code to run script2.py at the end of script1.py
 try:
     subprocess.run(["python", "power_per_participant.py"])
@@ -260,4 +269,19 @@ try:
 except:
     print('continue')
 
-subprocess.run(["python", "time_locked_preprocessing_loop.py"])
+subprocess.run(["python", "time_locked_prepr ocessing_loop.py"])
+
+try:
+    subprocess.run(["python", "time_locked_homologous_coupling.py"])
+except:
+    print('continue')
+
+try:
+    subprocess.run(["python", "time_locked_power_per_participant.py"])
+except:
+    print('continue')
+
+try:
+    subprocess.run(["python", "time_locked_tfr_coupling.py"])
+except:
+    print('continue')

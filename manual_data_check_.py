@@ -25,7 +25,7 @@ raw_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\raw data
 prep_path = os.path.join(path, "preprocessed data")
 log_path = os.path.join(path, "logs")
 
-
+from autoreject import get_rejection_threshold  # noqa
 
 # loop through all data files
 pair = 1
@@ -41,8 +41,8 @@ for root, dirs, files in os.walk(prep_path):
             split_name = name.split("_")
             pair = int(split_name[1])
 
-            #if pair != 6:
-            #    continue
+            if pair != 11:
+                continue
 
 
             with open(file_path,"rb") as input_file:
@@ -51,9 +51,39 @@ for root, dirs, files in os.walk(prep_path):
             print(np.shape(cleaned_epochs_AR[0].get_data()))
             print(np.shape(cleaned_epochs_AR[1].get_data()))
 
+            
+
+            # We can use the `decim` parameter to only take every nth time slice.
+            # This speeds up the computation time. Note however that for low sampling
+            # rates and high decimation parameters, you might not detect "peaky artifacts"
+            # (with a fast timecourse) in your data. A low amount of decimation however is
+            # almost always beneficial at no decrease of accuracy.
+            reject = get_rejection_threshold(cleaned_epochs_AR[0], decim=2)
+            reject = get_rejection_threshold(cleaned_epochs_AR[1], decim=2)
+            #print(np.shape(cleaned_epochs_AR[1].get_data()))
+
             mne.Epochs.plot(cleaned_epochs_AR[0], n_channels=64, block = True)
 
             mne.Epochs.plot(cleaned_epochs_AR[1], n_channels=64, block = True)
+            cleaned_epochs_AR[0].average().plot()
+            cleaned_epochs_AR[1].average().plot()
+
+
+            reject = get_rejection_threshold(cleaned_epochs_AR[0], decim=2)
+
+            cleaned_epochs_AR[0].drop_bad(reject=reject)
+            cleaned_epochs_AR[0].average().plot()
+
+            reject = get_rejection_threshold(cleaned_epochs_AR[1], decim=2)
+
+            cleaned_epochs_AR[1].drop_bad(reject=reject)
+            cleaned_epochs_AR[1].average().plot()
+
+            mne.Epochs.plot(cleaned_epochs_AR[0], n_channels=64, block = True)
+
+            mne.Epochs.plot(cleaned_epochs_AR[1], n_channels=64, block = True)
+
+            reject = get_rejection_threshold(cleaned_epochs_AR[1], decim=2)
 
             print(cleaned_epochs_AR[0].drop_log)
 

@@ -95,18 +95,20 @@ for root, dirs, files in os.walk(raw_path):
             trials = extract_trials(raw_events)
             sfreq = raw.info['sfreq']
             old_event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual/Egalitarian': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
+           
             event_id = define_event_dictionary()
             events = create_erp_epochs(trials, sfreq, raw_events, old_event_id, event_id)
 
             
             # delete entries from event ids that are not present in the events
+            
             keys_to_delete = []
             for  key, value in event_id.items():
                 if not (value in events[:,2]):
                     keys_to_delete.append(key)
             for key in keys_to_delete:
                 del event_id[key]
-      
+            
             
             raws = [raw_1, raw_2]
             """
@@ -186,10 +188,11 @@ for root, dirs, files in os.walk(raw_path):
 
             for raw in raws_ICA_applied:
                 epoch = mne.Epochs(raw, events, event_id, event_repeated = 'drop', on_missing = 'ignore', tmin=-1, tmax=1, preload=True, baseline=(0, 0))
+                epoch.resample(sfreq=512)
                 epochs.append(epoch)
 
-            n_interpolates = np.array([1, 2, 3, 4])
-            consensus_percs = None
+            n_interpolates = np.array([1, 2, 4, 6])
+            consensus_percs = np.linspace(0, 0.2, 5)
 
             cleaned_epochs_AR, dic_AR, bad_epochs_AR  = AR_local_custom(epochs, n_interpolates, consensus_percs,
                                                     strategy="union",

@@ -40,6 +40,12 @@ raw_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\raw data
 prep_path = os.path.join(path, "preprocessed data")
 log_path = os.path.join(path, "logs")
 
+from scipy.signal import filtfilt, butter
+
+# Create a low-pass filter
+nyquist = 0.5 * 512  # Nyquist frequency
+cutoff_frequency = 10  # Desired cutoff frequency in Hz
+b, a = butter(4, cutoff_frequency / nyquist)
 
 
 # loop through all data files
@@ -174,11 +180,16 @@ for root, dirs, files in os.walk(prep_path):
                             Y_coeff = Y[epoch, channel, frequency_band, :]
                             
                             # Compute the orthogonal projections
-                            Y_proj_on_X = (np.imag(Y_coeff) * np.conj(X_coeff)) / np.abs(X_coeff)
-                            X_proj_on_Y = (np.imag(X_coeff) * np.conj(Y_coeff)) / np.abs(Y_coeff)
+                            Y_proj_on_X = np.imag((Y_coeff) * np.conj(X_coeff) / np.abs(X_coeff))
+                            X_proj_on_Y = np.imag((X_coeff) * np.conj(Y_coeff) / np.abs(Y_coeff))
+
                             
                             Y_orthogonal = np.abs(Y_proj_on_X)
                             X_orthogonal = np.abs(X_proj_on_Y)
+                            # Apply the filter to the amplitude envelope
+                            Y_orthogonal = filtfilt(b, a, Y_orthogonal)
+                            X_orthogonal = filtfilt(b, a, X_orthogonal)
+
                             
                             # Compute correlation between the magnitudes of the orthogonal projections
                             if np.std(Y_orthogonal) * np.std(X_orthogonal) != 0:  # Avoid division by zero
