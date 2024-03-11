@@ -25,6 +25,8 @@ import pickle
 import os
 from my_utils import compute_freq_bands, compute_freq_bands_memory_saving
 from stat_utils import get_two_way_channel_clusters, plot_two_way_channel_clusters
+from mne.time_frequency import tfr_morlet
+from scipy.signal import hilbert
 #import statsmodels.api as sm
 import autoreject
 #from statsmodels.formula.api import ols
@@ -115,18 +117,31 @@ for root, dirs, files in os.walk(prep_path):
                     epoch_positions = np.where(preproc_S1.events[:,2] == event_id[condition])
 
 
-               
-
-                    # to ensure that there are not too many epoehcs (which makes it crash), we will randomly select 200 epochs in case there are more than 200
-                   # if len(epoch_positions) > 200:
-                    #    data_1
 
                     data_inter = np.array([preproc_S1[condition], preproc_S2[condition]])
+
+                     # Define frequencies of interest
+                    freqs = np.arange(1, 45, 1)  # 1 to 40 Hz in 1 Hz steps
+                    n_cycles = freqs / 4.  # Different number of cycle per frequency
+
+                    # Define wavelet parameters
+                    decim = 2  # To reduce computation time, you can increase this number
+                    n_jobs = 1  # Number of parallel jobs to run. Can be increased if your machine supports it.
+
+                    # now instead of computing frequency bands, compute the fourier coefficients for all frequencies
+                     
+                    power_1 = tfr_morlet(preproc_S1[condition], freqs=freqs, n_cycles=n_cycles, use_fft=True,
+                                return_itc=False, decim=decim, n_jobs=n_jobs, average = False)    
+                
+                    power_2 = tfr_morlet(preproc_S2[condition], freqs=freqs, n_cycles=n_cycles, use_fft=True,
+                                return_itc=False, decim=decim, n_jobs=n_jobs, average = False)    
                     
-                    complex_signal = compute_freq_bands(data_inter, 512, freq_bands)
-                    del data_inter
+                    #complex_signal = compute_freq_bands(data_inter, 512, freq_bands)
+                    #del data_inter
                     
-                    pair_complex_signal_dict[condition] = complex_signal
+                    fourrier_coefficients = [power_1, power_2]
+
+                    pair_complex_signal_dict[condition] = fourrier_coefficients
                     #del complex_signal
                 else:
                     # if there are no epochs for the condition, just continue
@@ -139,26 +154,28 @@ for root, dirs, files in os.walk(prep_path):
             participant_2_power_values = dict()
             for condition in event_id.keys():
                 try: 
-                    complex_signal =   pair_complex_signal_dict[condition]
+                    fourrier_coefficients =   pair_complex_signal_dict[condition]
                 except:
                     # if there is no data for the condition then just go to the next
                     continue
-
+                
+                powers = np.zeros((n_epochs, n_channels, n_frequency_bands, n_times))
                 # split up into frequencies and calculate for each frequency seperately
                 result_list = []
-                n_epochs, n_ch, n_times = complex_signal.shape[1], complex_signal.shape[2], complex_signal.shape[4]
+                n_epochs, n_ch, n_times = fourrier_coefficients[0].shape[1], fourrier_coefficients[0].shape[2], fourrier_coefficients[0].shape[4]
                 # (2, n_epochs, n_channels, n_freq_bands, n_times)
                 
-                magnitude_1 = np.abs(complex_signal[0,:,:,:,:])
-                magnitude_2 = np.abs(complex_signal[1,:,:,:,:])
+                #magnitude_1 = np.abs(fourrier_coefficients[0])
+                #magnitude_2 = np.abs(fourrier_coefficients[1])
 
-                power_1 = magnitude_1 ** 2
-                power_2 = magnitude_2 ** 2
-            
+                #power_1 = magnitude_1 ** 2
+                #power_2 = magnitude_2 ** 2
+
+
                 
-                # final_power
-                average_powers_1 = np.mean(power_1, axis=(0, 3))
-                average_powers_2 = np.mean(power_2, axis=(0, 3))
+                # final_power (averaged over epochs and times)
+                average_powers_1 = np.mean(fourrier_coefficients, axis=(0, 3))
+                average_powers_2 = np.mean(fourrier_coefficients, axis=(0, 3))
 
 
                 if condition == 'Synchronous/LeaderFollower':
@@ -213,25 +230,25 @@ for root, dirs, files in os.walk(prep_path):
 
                     # split up into frequencies and calculate for each frequency seperately
                     result_list = []
-                    n_epochs, n_ch, n_times = complex_signal.shape[1], complex_signal.shape[2], complex_signal.shape[4]
+                    n_epochs, n_ch, n_times = fourrier_coefficients[0].shape[1], fourrier_coefficients[0].shape[2], fourrier_coefficients.shape[4]
                     # (2, n_epochs, n_channels, n_freq_bands, n_times)
                     
                     if many == 0:
-                        complex_signal_2 = complex_signal[1, :, :, :, :]
+                        complex_signal_2 = fourrier_coefficients[1]
                         averaged_motor_signal_2 = np.mean(complex_signal_2[ :, motor_channel_numbers, :, :], axis = 1)
                         n_channels = 64
                         averaged_motor_signal_2 = averaged_motor_signal_2[:, np.newaxis, :, :]
                         #averaged_motor_signal_2= np.tile(averaged_motor_signal_2[:, np.newaxis, :, :], (1, n_channels, 1, 1))
                         signal_2 = averaged_motor_signal_2
-                        signal_1 = complex_signal[0, :, :, :, :]
+                        signal_1 = fourrier_coefficients[0]
                     else:
-                        complex_signal_1 = complex_signal[0, :, :, :, :]
+                        complex_signal_1 = fourrier_coefficients[0]
                         averaged_motor_signal_1 = np.mean(complex_signal_1[ :, motor_channel_numbers, :, :], axis = 1)
                         averaged_motor_signal_1 = averaged_motor_signal_1[:, np.newaxis, :, :]
                         n_channels = 64
                         #averaged_motor_signal_1 = np.tile(averaged_motor_signal_2[:, np.newaxis, :, :], (1, n_channels, 1, 1))
                         signal_1 = averaged_motor_signal_1
-                        signal_2 = complex_signal[1, :, :, :, :]
+                        signal_2 = fourrier_coefficients[1]
 
 
                     # now compute the cross_spectrum and auto spectrum of signals (homologous channels)
@@ -278,9 +295,15 @@ for root, dirs, files in os.walk(prep_path):
                                 
                                 Y_orthogonal = np.abs(Y_proj_on_X)
                                 X_orthogonal = np.abs(X_proj_on_Y)
+
+
+                                plt.plot(Y_orthogonal)
+                                plt.plot(X_orthogonal)
+                                plt.show()
+
                                 # Apply the filter to the amplitude envelope
-                                Y_orthogonal = filtfilt(b, a, Y_orthogonal)
-                                X_orthogonal = filtfilt(b, a, X_orthogonal)
+                                #Y_orthogonal = filtfilt(b, a, Y_orthogonal)
+                                #X_orthogonal = filtfilt(b, a, X_orthogonal)
 
 
                                 # Compute correlation between the magnitudes of the orthogonal projections

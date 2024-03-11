@@ -1,29 +1,24 @@
+"""
+calculate the individual tfr spectrum, as well as the inter-brain coupling between participants
+
+"""
+
 
 import io
 from copy import copy
 from collections import OrderedDict
-#from hamcrest import none
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy
-import h5py
 import mne
-#import hypyp
-import requests
 import os
-import PyQt5
 import sys
-import copy
 import pickle
 import os
 from my_utils import compute_freq_bands
 from mne.time_frequency import tfr_morlet
 from scipy.signal import hilbert
-#import statsmodels.api as sm
-import autoreject
-#from statsmodels.formula.api import ols
-#print(sys.path)
+
+
 sys.path.append('C:/Users/Administrateur/MilitaryCoordination/')
 
 # Define your frequency bands
@@ -80,13 +75,13 @@ for root, dirs, files in os.walk(prep_path):
 
             # Assuming `event_id` is your dictionary of event IDs
             filtered_event_id = {key: value for key, value in event_id.items() if 'Success/Checkpoint' in key}
-
+            
             # Print the filtered event IDs
             #print(filtered_event_id)
 
 
-            preproc_S1 = preproc_S1[list(filtered_event_id.values())]
-            preproc_S2 = preproc_S2[list(filtered_event_id.values())]
+            preproc_S1 = preproc_S1[list(filtered_event_id.keys())]
+            preproc_S2 = preproc_S2[list(filtered_event_id.keys())]
 
             
             # Define frequencies of interest
@@ -121,23 +116,27 @@ for root, dirs, files in os.walk(prep_path):
             for name in filtered_event_id.keys():
                 new_event_ids.append(name.rsplit('/', 1)[0])
 
-            print(new_event_ids)
-            for condition in new_event_ids:
+           
+            power_1 = tfr_morlet(preproc_S1, freqs=freqs, n_cycles=n_cycles, use_fft=True,
+                                return_itc=False, output = "complex", decim=decim, n_jobs=n_jobs, average = False)    
                 
-                try:
+            power_2 = tfr_morlet(preproc_S2, freqs=freqs, n_cycles=n_cycles, use_fft=True,
+                                return_itc=False, output = "complex", decim=decim, n_jobs=n_jobs, average = False)    
 
-                    power_1 = tfr_morlet(preproc_S1[condition], freqs=freqs, n_cycles=n_cycles, use_fft=True,
-                                return_itc=False, decim=decim, n_jobs=n_jobs, average = False)    
-                
-                    power_2 = tfr_morlet(preproc_S2[condition], freqs=freqs, n_cycles=n_cycles, use_fft=True,
-                                return_itc=False, decim=decim, n_jobs=n_jobs, average = False)    
+            for condition in new_event_ids:
+           
+                try:
+                    # store a version that is averaged over epochs but not yet over channels or time
+                    # so it can be used both to plot average scalp power and to plot individual tfr
+                    average_powers_1 = np.mean(np.abs(power_1[condition].data)**2, axis = 0)
+                    average_powers_2 = np.mean(np.abs(power_2[condition].data)**2, axis = 0)
+                   
                 except: 
                     continue
                 
     
+              
 
-                average_powers_1 = np.mean(power_1[condition].data, axis = 0)
-                average_powers_2 = np.mean(power_2[condition].data, axis = 0)
 
                 if 'Synchronous/LeaderFollower' in condition:
                     participant_1_power_values['Synchronous/Leader'] = average_powers_1
@@ -156,10 +155,10 @@ for root, dirs, files in os.walk(prep_path):
                     participant_2_power_values['Synchronous/Egalitarian'] = average_powers_2
                 elif 'Complementary/Egalitarian' in condition:
                     participant_1_power_values['Complementary/Egalitarian'] = average_powers_1
-                    participant_2_power_values['Complementary/Egalitarian'] = average_powers_2 # Added line for 'ppc'
+                    participant_2_power_values['Complementary/Egalitarian'] = average_powers_2
                 elif 'Individual' in condition:
                     participant_1_power_values['Individual'] = average_powers_1
-                    participant_2_power_values['Individual'] = average_powers_2# Added line for 'ppc'
+                    participant_2_power_values['Individual'] = average_powers_2
 
         
             storepath = os.path.join(connectivity_path, 'individual_tfr_pair'+ str(pair))
@@ -185,17 +184,14 @@ for root, dirs, files in os.walk(prep_path):
             
             pair_imcoh_values = dict()
             pair_ppc_values = dict()
+            pair_trf_synchrony = dict()
             for condition in filtered_event_id.keys():
                 try: 
 
-                    power_1 = tfr_morlet(preproc_S1[condition], freqs=freqs, n_cycles=n_cycles, use_fft=True,
-                            return_itc=False, decim=decim, n_jobs=n_jobs, average = False)    
-            
-                    power_2 = tfr_morlet(preproc_S2[condition], freqs=freqs, n_cycles=n_cycles, use_fft=True,
-                            return_itc=False, decim=decim, n_jobs=n_jobs, average = False)                    
+                         
 
-                    signal_1 = power_1.data
-                    signal_2 = power_2.data
+                    signal_1 = power_1[condition].data
+                    signal_2 = power_2[condition].data
                 except:
                     # if there is no data for the condition then just go to the next
                     continue
@@ -211,45 +207,126 @@ for root, dirs, files in os.walk(prep_path):
                 X = signal_1
                 Y = signal_2
 
-                n_epochs = X.shape[0]
-                n_channels = X.shape[1]
-                n_frequency_bands = X.shape[2]
-                n_times = X.shape[3]
+                n_epochs = signal_1.shape[0]
+                n_channels = signal_1.shape[1]
+                n_frequency_bands = signal_1.shape[2]
+                n_times = signal_1.shape[3]
 
                 # Initialize an array to hold the PPC values for each epoch, channel, and frequency band
-                ppc = np.zeros((n_epochs, n_channels, n_frequency_bands, n_times))
-
+                ppc_over_time = np.zeros((n_epochs, n_channels, n_frequency_bands, n_times))
+                ppc = np.zeros((n_epochs, n_channels, n_frequency_bands))
+                imcoh = np.zeros((n_epochs, n_channels, n_frequency_bands))
                 for epoch in range(n_epochs):
                     for channel in range(n_channels):
-                        for frequency_band in range(n_frequency_bands):
-                            # Extract the spectral coefficients for the current epoch, channel, and frequency band
-                            X_coeff = X[epoch, channel, frequency_band, :]
-                            Y_coeff = Y[epoch, channel, frequency_band, :]
-                            
+                        for i, freq_band in enumerate(freq_bands.values()):
 
-                            X_coeff = hilbert(X_coeff)
-                            Y_coeff  = hilbert(Y_coeff)
+                            X = signal_1[epoch, channel, freq_band[0]:freq_band[1], :]
+                            Y = signal_2[epoch, channel, freq_band[0]:freq_band[1], :]
+
+                            #IMAGINARY COHERENCE 
+                            cross_spectrum = np.mean(X * np.conj(Y), axis=-1)
+
+                            auto_spectrum1 = np.mean(X * np.conj(X), axis=-1)
+                            auto_spectrum2 = np.mean(Y * np.conj(Y), axis=-1)
+
+                            # now calculculate the imaginary coherence
+                            imag_coherence = np.abs(np.imag(cross_spectrum / np.sqrt(auto_spectrum1 * auto_spectrum2)))
+
+
+                            # and take the coefficients that belong to the frequency of interest
+
+                            imcoh[epoch, channel, i] = np.mean(imag_coherence)  
+
+
+                            #PROJECTED POWER CORRELATIONS 
+                            X_coeff = X
+                            Y_coeff = Y
+                            
+                            # extract the parts of X and Y that are orthogonal to each other
+                            
+                            X_orthogonal = np.imag((X_coeff) * np.conj(Y_coeff) / np.abs(Y_coeff))
+                            Y_orthogonal = np.imag((Y_coeff) * np.conj(X_coeff) / np.abs(X_coeff))    
+
+                            # get the absolute values of the orthogonal parts
+                            
+                            X_orthogonal = np.abs(X_orthogonal)
+                            Y_orthogonal = np.abs(Y_orthogonal)
+
+                            # average over frequency bands
+                            X_orthogonal = np.mean(X_orthogonal, axis = 0) 
+                            Y_orthogonal = np.mean(Y_orthogonal, axis = 0) 
+
+
+
+
+                            # Compute correlation between the magnitudes of the orthogonal projections
+                            if np.std(Y_orthogonal) * np.std(X_orthogonal) != 0:  # Avoid division by zero
+                                ppc_value = np.corrcoef(Y_orthogonal, X_orthogonal)[0, 1]
+                            else:
+                                ppc_value = 0  # Assign a default value in case of std deviation being zero
+                           
+                            ppc[epoch, channel, i] = ppc_value
+
+
+                # now average over the epochs and store for this pair-condition
+                pair_ppc_values[condition] = np.mean(ppc, axis = 0)
+                pair_imcoh_values[condition] = np.mean(imcoh, axis = 0)
+
+
+                # now calculate instantaneous coupling between amplitude enveloppes
+                trf_ppc = np.zeros((n_epochs, n_channels, n_frequency_bands, n_times))
+                for epoch in range(n_epochs):
+                    for channel in range(n_channels):
+                        for freq in range(len(freqs)):
+
+                            X = signal_1[epoch, channel, freq, :]
+                            Y = signal_2[epoch, channel, freq, :]
+
+
+                            # Extract and average the spectral coefficients for the current epoch, channel, and frequency band
+                            X_coeff = Y
+                            Y_coeff = X
+
+                           
+                            # extract the parts of X and Y that are orthogonal to each other
+                            
+                            X_orthogonal = np.imag((X_coeff) * np.conj(Y_coeff) / np.abs(Y_coeff))
+                            Y_orthogonal = np.imag((Y_coeff) * np.conj(X_coeff) / np.abs(X_coeff))    
+
+                            # get the absolute values of the orthogonal parts
+                            X_orthogonal = np.abs(X_orthogonal)
+                            Y_orthogonal = np.abs(Y_orthogonal)
+
+                            # get the phase of the enveloppe using hilbert
+                            X_orthogonal = hilbert(X_orthogonal)
+                            Y_orthogonal  = hilbert(Y_orthogonal)
 
                   
-                            X_phase = np.angle(X_coeff)
-                            Y_phase = np.angle(Y_coeff)
-
+                            X_phase = np.angle(X_orthogonal)
+                            Y_phase = np.angle(Y_orthogonal)
                             
-                            
-
+                        
                             # Compute the instantaneous phase difference
-                            phase_difference = np.abs(Y_phase - X_phase) 
+                            instant_synchronization  = np.abs(Y_phase - X_phase) # np.abs(np.exp(1j * (X_phase - Y_phase)))# = np.abs(Y_phase - X_phase) 
                                           
+                  
+
                             # Store the PPC value for the current epoch, channel, and frequency band
-                            ppc[epoch, channel, frequency_band,:] = phase_difference
+                            trf_ppc[epoch, channel, freq_band,:] = instant_synchronization
 
-                # now average over the epochs
-                ppc_values_averaged = np.mean(ppc, axis = 0)
+                # average over trials and store as instantaneous power synchrony measure
+                pair_trf_synchrony[condition] = np.mean(trf_ppc, axis = 0)
 
 
-                pair_ppc_values[condition] = ppc_values_averaged 
+            
+            storepath = os.path.join(connectivity_path, 'homologous_connectivity_pair_'+ str(pair))
+            with open(storepath, "wb") as output_file: 
+                pickle.dump([pair_imcoh_values, pair_ppc_values], output_file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
             storepath = os.path.join(connectivity_path, 'homologous_tfr_pair_'+ str(pair))
             with open(storepath, "wb") as output_file: 
-                pickle.dump(pair_ppc_values, output_file, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(pair_trf_synchrony, output_file, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+            

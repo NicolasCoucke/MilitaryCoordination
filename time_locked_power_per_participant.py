@@ -108,7 +108,8 @@ for root, dirs, files in os.walk(prep_path):
 
             # Print the filtered event IDs
             #print(filtered_event_id)
-
+            preproc_S1 = preproc_S1[list(filtered_event_id.keys())]
+            preproc_S2 = preproc_S2[list(filtered_event_id.keys())]
                 
             # calculate the complex signal (hilbert) for each frequency band 
             print('calculate complex signal for all conditions')

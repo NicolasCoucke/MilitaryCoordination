@@ -31,7 +31,7 @@ from hypyp import prep
 from hypyp import stats
 from hypyp import viz
 """
-connectivity_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\connectivity data"
+connectivity_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\time locked connectivity"
 # loop through all data files
 individual_stack = np.zeros((64,5))
 sync_egal_stack = np.zeros((64,5))
@@ -44,7 +44,7 @@ complementary_follower_stack = np.zeros((64,5))
 pair = 1
 for root, dirs, files in os.walk(connectivity_path):
     for name in files:
-        if 'homologous_' in name:
+        if 'homologous_pair' in name:
 
             file_path = os.path.join(connectivity_path, name)
             # define paths
@@ -60,7 +60,7 @@ for root, dirs, files in os.walk(connectivity_path):
             with open(file_path,"rb") as input_file:
                 imcoh_values, ppc_values = pickle.load(input_file)
 
-            values = imcoh_values
+            values = ppc_values
             #print(participant_power_values )
             #print(np.shape(participant_1_power_values['Synchronous/Egalitarian']))
 
@@ -74,29 +74,33 @@ for root, dirs, files in os.walk(connectivity_path):
             freq_bands = OrderedDict(freq_bands)
             # select condition and frequency band
             event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
+            print(values.keys())
 
-        
-            print(np.shape(values['Individual']))
+            
+            
             individual_stack = np.dstack((individual_stack, values['Individual']))
-            sync_egal_stack = np.dstack((sync_egal_stack , values['Synchronous/Egalitarian']))
+            #print(np.shape(values['Individual']))
             try:
-                leader_stack = np.dstack((leader_stack , values['Synchronous/LeaderFollower']))
-            except:
+                individual_stack = np.dstack((individual_stack, values['Individual']))
+                sync_egal_stack = np.dstack((sync_egal_stack , values['Synchronous/Egalitarian']))
+
+
                 try:
+                    leader_stack = np.dstack((leader_stack , values['Synchronous/LeaderFollower']))
+                except:
                     leader_stack = np.dstack((leader_stack , values['Synchronous/FollowerLeader']))
-                except:
-                    continue
-            #follower_stack = np.dstack((follower_stack , values['Synchronous/Follower']))
-            complementary_sync_egal_stack = np.dstack((complementary_sync_egal_stack , values['Complementary/Egalitarian']))
-            try:
-                complementary_leader_stack = np.dstack((complementary_leader_stack , values['Complementary/LeaderFollower']))
-            except:
+
+            
+                complementary_sync_egal_stack = np.dstack((complementary_sync_egal_stack , values['Complementary/Egalitarian']))
+            
                 try:
-                    complementary_leader_stack = np.dstack((complementary_follower_stack , values['Complementary/FollowerLeader']))
+                    complementary_leader_stack = np.dstack((complementary_leader_stack , values['Complementary/LeaderFollower']))
                 except:
-                    continue
+                    complementary_leader_stack = np.dstack((complementary_follower_stack , values['Complementary/FollowerLeader']))
+            except:
+                continue
 
-
+print(np.shape(individual_stack))
 individual_stack = individual_stack[:,:,1:]
 sync_egal_stack = sync_egal_stack[:,:,1:]
 leader_stack = leader_stack[:,:,1:]

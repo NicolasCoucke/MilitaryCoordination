@@ -57,8 +57,14 @@ for root, dirs, files in os.walk(connectivity_path):
            # if pair < 15:
             #    continue
 
+            
+
+
             with open(file_path,"rb") as input_file:
                 participant_1_power_values, participant_2_power_values = pickle.load(input_file)
+
+            if len(participant_1_power_values.keys()) != 7:
+                continue
 
             #print(participant_1_power_values)
             print(participant_2_power_values.keys())

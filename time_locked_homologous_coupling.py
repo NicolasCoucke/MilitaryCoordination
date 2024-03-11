@@ -90,6 +90,8 @@ for root, dirs, files in os.walk(prep_path):
 
             # Print the filtered event IDs
             #print(filtered_event_id)
+            preproc_S1 = preproc_S1[list(filtered_event_id.keys())]
+            preproc_S2 = preproc_S2[list(filtered_event_id.keys())]
 
                 
             # calculate the complex signal (hilbert) for each frequency band 
@@ -200,6 +202,8 @@ for root, dirs, files in os.walk(prep_path):
                             # Apply the filter to the amplitude envelope
                             Y_orthogonal = filtfilt(b, a, Y_orthogonal)
                             X_orthogonal = filtfilt(b, a, X_orthogonal)
+
+                           
 
                             # Compute correlation between the magnitudes of the orthogonal projections
                             if np.std(Y_orthogonal) * np.std(X_orthogonal) != 0:  # Avoid division by zero
