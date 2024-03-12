@@ -22,7 +22,7 @@ sys.path.append('C:/Users/Administrateur/MilitaryCoordination/')
 
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1"
 raw_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\raw data"
-prep_path = os.path.join(path, "preprocessed data")
+prep_path = os.path.join(path, "time locked preprocessed")
 log_path = os.path.join(path, "logs")
 
 from autoreject import get_rejection_threshold  # noqa
@@ -41,8 +41,7 @@ for root, dirs, files in os.walk(prep_path):
             split_name = name.split("_")
             pair = int(split_name[1])
 
-            if pair != 11:
-                continue
+       
 
 
             with open(file_path,"rb") as input_file:
@@ -58,41 +57,34 @@ for root, dirs, files in os.walk(prep_path):
             # rates and high decimation parameters, you might not detect "peaky artifacts"
             # (with a fast timecourse) in your data. A low amount of decimation however is
             # almost always beneficial at no decrease of accuracy.
-            reject = get_rejection_threshold(cleaned_epochs_AR[0], decim=2)
-            reject = get_rejection_threshold(cleaned_epochs_AR[1], decim=2)
+
+
+            mne.Epochs.plot(cleaned_epochs_AR[0], n_channels=64, block = True)
+
+            mne.Epochs.plot(cleaned_epochs_AR[0], n_channels=64, block = True)
             #print(np.shape(cleaned_epochs_AR[1].get_data()))
 
-            mne.Epochs.plot(cleaned_epochs_AR[0], n_channels=64, block = True)
-
-            mne.Epochs.plot(cleaned_epochs_AR[1], n_channels=64, block = True)
-            cleaned_epochs_AR[0].average().plot()
-            cleaned_epochs_AR[1].average().plot()
-
-
-            reject = get_rejection_threshold(cleaned_epochs_AR[0], decim=2)
-
-            cleaned_epochs_AR[0].drop_bad(reject=reject)
-            cleaned_epochs_AR[0].average().plot()
-
-            reject = get_rejection_threshold(cleaned_epochs_AR[1], decim=2)
-
-            cleaned_epochs_AR[1].drop_bad(reject=reject)
-            cleaned_epochs_AR[1].average().plot()
-
-            mne.Epochs.plot(cleaned_epochs_AR[0], n_channels=64, block = True)
-
-            mne.Epochs.plot(cleaned_epochs_AR[1], n_channels=64, block = True)
-
-            reject = get_rejection_threshold(cleaned_epochs_AR[1], decim=2)
+            cleaned_epochs_AR[0].interpolate_bads()
+            cleaned_epochs_AR[1].interpolate_bads()
 
             print(cleaned_epochs_AR[0].drop_log)
+            bad = list(set(cleaned_epochs_AR[0].drop_log[0].tolist()).union(set(cleaned_epochs_AR[1].drop_log[0].tolist())))
+            
+            print(bad)
 
-            # Step 2: Retrieve indices of bad epochs
+
+             # Step 2: Retrieve indices of bad epochs
             bad_epochs_0 = [i for i, log in enumerate(cleaned_epochs_AR[0].drop_log) if len(log) != 0]
             bad_epochs_1 = [i for i, log in enumerate(cleaned_epochs_AR[1].drop_log) if len(log) != 0]
 
             # Step 3: Merge bad epochs lists
             combined_bad_epochs = list(set(bad_epochs_0 + bad_epochs_1))
+
+            # Step 4: Reject bad epochs from both Epochs objects
+            cleaned_epochs_AR[0].drop(indices=combined_bad_epochs, reason='manual rejection', verbose=True)
+            cleaned_epochs_AR[1].drop(indices=combined_bad_epochs, reason='manual rejection', verbose=True)
+
+           
 
             # Step 4: Reject bad epochs from both Epochs objects
            # cleaned_epochs_AR[0].drop(indices=combined_bad_epochs, reason='manual rejection', verbose=True)

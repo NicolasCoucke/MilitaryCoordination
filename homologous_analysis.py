@@ -77,7 +77,9 @@ for root, dirs, files in os.walk(connectivity_path):
             print(values.keys())
 
             
-            
+          
+
+
             individual_stack = np.dstack((individual_stack, values['Individual']))
             #print(np.shape(values['Individual']))
             try:

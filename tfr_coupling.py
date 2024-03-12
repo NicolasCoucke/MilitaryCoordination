@@ -30,9 +30,9 @@ freq_bands = {
 }
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1"
 raw_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\raw data"
-prep_path = os.path.join(path, "time locked preprocessed")
+prep_path = os.path.join(path, "preprocessed data")
 log_path = os.path.join(path, "logs")
-connectivity_path = os.path.join(path, "time locked connectivity")
+connectivity_path = os.path.join(path, "connectivity data")
 
 
 # loop through all data files
@@ -70,18 +70,7 @@ for root, dirs, files in os.walk(prep_path):
 
              #print(list(preproc_S1.event_id.keys()))
             event_id = preproc_S1.event_id
-           # print(event_id)
-
-            # Assuming `event_id` is your dictionary of event IDs
-            filtered_event_id = {key: value for key, value in event_id.items() if 'Success/Checkpoint' in key}
-            
-            # Print the filtered event IDs
-            #print(filtered_event_id)
-
-
-            preproc_S1 = preproc_S1[list(filtered_event_id.keys())]
-            preproc_S2 = preproc_S2[list(filtered_event_id.keys())]
-
+          
             
             # Define frequencies of interest
             freqs = np.arange(1, 45, 1)  # 1 to 40 Hz in 1 Hz steps
@@ -108,12 +97,8 @@ for root, dirs, files in os.walk(prep_path):
 
             participant_1_power_values = dict()
             participant_2_power_values = dict()
-            # calculate the complex signal (hilbert) for each frequency band 
-            power_1_event_id_keys = [str(key).strip() for key in preproc_S1.event_id.keys()]
-            
-            new_event_ids = []
-            for name in filtered_event_id.keys():
-                new_event_ids.append(name.rsplit('/', 1)[0])
+
+  
 
            
             power_1 = tfr_morlet(preproc_S1, freqs=freqs, n_cycles=n_cycles, use_fft=True,
@@ -122,7 +107,7 @@ for root, dirs, files in os.walk(prep_path):
             power_2 = tfr_morlet(preproc_S2, freqs=freqs, n_cycles=n_cycles, use_fft=True,
                                 return_itc=False, output = "complex", decim=decim, n_jobs=n_jobs, average = False)    
 
-            for condition in new_event_ids:
+            for condition in event_id.keys():
            
                 try:
                     # store a version that is averaged over epochs but not yet over channels or time
@@ -159,7 +144,8 @@ for root, dirs, files in os.walk(prep_path):
                     participant_1_power_values['Individual'] = average_powers_1
                     participant_2_power_values['Individual'] = average_powers_2
 
-        
+
+            # LATER ON WE CAN AVERAGE OVER TIME
             storepath = os.path.join(connectivity_path, 'individual_tfr_pair'+ str(pair))
             with open(storepath, "wb") as output_file: 
                 pickle.dump([participant_1_power_values, participant_2_power_values], output_file, protocol=pickle.HIGHEST_PROTOCOL)                    
@@ -184,7 +170,7 @@ for root, dirs, files in os.walk(prep_path):
             pair_imcoh_values = dict()
             pair_ppc_values = dict()
             pair_trf_synchrony = dict()
-            for condition in new_event_ids:
+            for condition in event_id.keys():
                 try: 
 
                          
@@ -323,9 +309,10 @@ for root, dirs, files in os.walk(prep_path):
                 pickle.dump([pair_imcoh_values, pair_ppc_values], output_file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-            storepath = os.path.join(connectivity_path, 'homologous_tfr_pair_'+ str(pair))
-            with open(storepath, "wb") as output_file: 
-                pickle.dump(pair_trf_synchrony, output_file, protocol=pickle.HIGHEST_PROTOCOL)
+            # DONT NEED THIS WHEN NOT TIME LOCKED
+            #storepath = os.path.join(connectivity_path, 'homologous_tfr_pair_'+ str(pair))
+            #with open(storepath, "wb") as output_file: 
+            #    pickle.dump(pair_trf_synchrony, output_file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
             
