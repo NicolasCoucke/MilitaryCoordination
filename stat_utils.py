@@ -100,4 +100,22 @@ def plot_two_way_channel_clusters(F_obs_dict, clusters_dict, cluster_p_values_di
         # Plot the topomap with significant areas highlighted
         mne.viz.plot_topomap(dummy_data, info, mask=mask, cmap='Reds', axes=ax, sensors=True, show=False)
     
+
+def apply_fisher_z_transform(input_dict):
+    """
+    Applies the Fisher Z transformation to every element in each matrix of the input dict.
+
+    Parameters:
+    input_dict (dict): A dictionary where each value is an n-dimensional matrix.
+
+    Returns:
+    dict: A dictionary with the same structure where each value has been transformed.
+    """
+    transformed_dict = {}
     
+    for key, matrix in input_dict.items():
+        # Apply Fisher Z transformation
+        transformed_matrix = 0.5 * np.log((1 + matrix) / (1 - matrix))
+        transformed_dict[key] = transformed_matrix
+        
+    return transformed_dict

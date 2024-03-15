@@ -21,13 +21,7 @@ from scipy.signal import hilbert
 
 sys.path.append('C:/Users/Administrateur/MilitaryCoordination/')
 
-# Define your frequency bands
-freq_bands = {
-    'Theta': [4, 7],
-    'Alpha': [8, 12],
-    'Beta': [13, 30],
-    'Gamma': [30, 45]
-}
+
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1"
 raw_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\raw data"
 prep_path = os.path.join(path, "preprocessed data")
@@ -57,13 +51,7 @@ for root, dirs, files in os.walk(prep_path):
             preproc_S1 = cleaned_epochs_AR[0]
             preproc_S2 = cleaned_epochs_AR[1]
 
-            # define frequency bands 
-            freq_bands = {'Theta': [4, 7],
-                            'Alpha': [8, 12],
-                            'Beta': [13, 30],
-                            'Gamma': [30, 45],
-                            'Beta_narrow': [18, 22]}
-            freq_bands = OrderedDict(freq_bands)
+
             # select condition and frequency band
             event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
             pair_complex_signal_dict = {}
@@ -203,10 +191,10 @@ for root, dirs, files in os.walk(prep_path):
                 imcoh = np.zeros((n_epochs, n_channels, n_frequency_bands))
                 for epoch in range(n_epochs):
                     for channel in range(n_channels):
-                        for i, freq_band in enumerate(freq_bands.values()):
+                        for freq in range(n_frequency_bands):
 
-                            X = signal_1[epoch, channel, freq_band[0]:freq_band[1], :]
-                            Y = signal_2[epoch, channel, freq_band[0]:freq_band[1], :]
+                            X = signal_1[epoch, channel, freq, :]
+                            Y = signal_2[epoch, channel, freq, :]
 
                             #IMAGINARY COHERENCE 
                             cross_spectrum = np.mean(X * np.conj(Y), axis=-1)
@@ -220,7 +208,7 @@ for root, dirs, files in os.walk(prep_path):
 
                             # and take the coefficients that belong to the frequency of interest
 
-                            imcoh[epoch, channel, i] = np.mean(imag_coherence)  
+                            imcoh[epoch, channel, freq] = np.mean(imag_coherence)  
 
 
                             #PROJECTED POWER CORRELATIONS 
@@ -238,8 +226,8 @@ for root, dirs, files in os.walk(prep_path):
                             Y_orthogonal = np.abs(Y_orthogonal)
 
                             # average over frequency bands
-                            X_orthogonal = np.mean(X_orthogonal, axis = 0) 
-                            Y_orthogonal = np.mean(Y_orthogonal, axis = 0) 
+                            #X_orthogonal = np.mean(X_orthogonal, axis = 0) 
+                            #Y_orthogonal = np.mean(Y_orthogonal, axis = 0) 
 
 
 
@@ -250,7 +238,7 @@ for root, dirs, files in os.walk(prep_path):
                             else:
                                 ppc_value = 0  # Assign a default value in case of std deviation being zero
                            
-                            ppc[epoch, channel, i] = ppc_value
+                            ppc[epoch, channel, freq] = ppc_value
 
 
                 # now average over the epochs and store for this pair-condition
@@ -297,7 +285,7 @@ for root, dirs, files in os.walk(prep_path):
                   
 
                             # Store the PPC value for the current epoch, channel, and frequency band
-                            trf_ppc[epoch, channel, freq_band,:] = instant_synchronization
+                            trf_ppc[epoch, channel, freq,:] = instant_synchronization
 
                 # average over trials and store as instantaneous power synchrony measure
                 pair_trf_synchrony[condition] = np.mean(trf_ppc, axis = 0)

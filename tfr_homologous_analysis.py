@@ -45,7 +45,7 @@ complementary_leader_stack = np.zeros((44,512))
 complementary_follower_stack = np.zeros((44,512))
 
 stack_dict = dict()
-condition_names = ['Synchronous/Egalitarian', 'Synchronous/Leader', 'Synchronous/Follower', 'Individual', 'Complementary/Egalitarian', 'Complementary/Leader', 'Complementary/Follower']
+condition_names = ['Synchronous/Egalitarian', 'Synchronous/LeaderFollower', 'Synchronous/FollowerLeader', 'Individual/Egalitarian', 'Complementary/Egalitarian', 'Complementary/LeaderFollower', 'Complementary/FollowerLeader']
 for condition in condition_names:
     condition_stack = np.zeros((44,512))    
     stack_dict[condition] = condition_stack
@@ -64,14 +64,14 @@ for i in range(len(motor_channels)):
 pair = 1
 for root, dirs, files in os.walk(connectivity_path):
     for name in files:
-        if 'individual_tfr_pair' in name:
+        if 'homologous_tfr_pair' in name:
             print("processing file " + name)
 
             file_path = os.path.join(connectivity_path, name)
             # define paths
             print(file_path)
             
-            split_name = name.split("pair")
+            split_name = name.split("pair_")
             pair = int(split_name[1])
 
            # if pair < 15:
@@ -81,45 +81,51 @@ for root, dirs, files in os.walk(connectivity_path):
 
 
             with open(file_path,"rb") as input_file:
-                participant_1_power_values, participant_2_power_values = pickle.load(input_file)
+                pair_ppc_values = pickle.load(input_file)
+
 
             #if len(participant_1_power_values.keys()) != 7:
             #    continue
 
-            for participant_power_values in [participant_1_power_values, participant_2_power_values]:
-                #print(participant_power_values )
-                #print(np.shape(participant_1_power_values['Synchronous/Egalitarian']))
+        
+            #print(participant_power_values )
+            #print(np.shape(participant_1_power_values['Synchronous/Egalitarian']))
 
-                # define frequency bands 
-                freq_bands = {'Theta': [4, 7],
-                                'Alpha': [8, 12],
-                                'Beta': [13, 30],
-                                'Gamma': [30, 45],
-                                'Beta_narrow': [18, 22]}
-                freq_bands = OrderedDict(freq_bands)
-                # select condition and frequency band
-                event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
+            # define frequency bands 
+            freq_bands = {'Theta': [4, 7],
+                            'Alpha': [8, 12],
+                            'Beta': [13, 30],
+                            'Gamma': [30, 45],
+                            'Beta_narrow': [18, 22]}
+            freq_bands = OrderedDict(freq_bands)
+            # select condition and frequency band
+            event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
 
-                skip = False
-                for condition in condition_names:
-                        if condition not in participant_power_values.keys():
-                            skip = True
-                if skip:
-                    continue
-
-                try:
+            skip = False
+            for condition in condition_names:
                     
+                    cond_name = str(condition + '/Success/Checkpoint')
+                    print(cond_name)
+                    if cond_name not in pair_ppc_values.keys():
+                        print('skip')
+                        skip = True
+            if skip:
+                continue
 
-                    for condition in condition_names:
-                        
-                            condition_data = participant_power_values[condition]
-                            
-                            channel_data = np.mean(condition_data[motor_channel_numbers,:,:], axis = 0)
-                            
+        
+                
 
-                            stack_dict[condition] = np.dstack((stack_dict[condition], channel_data))
-                except:
-                    continue
+            for condition in condition_names:
+
+                    cond_name = str(condition + '/Success/Checkpoint')
+                    condition_data = pair_ppc_values[cond_name]
+                    
+                    channel_data = np.mean(condition_data[motor_channel_numbers,:,:], axis = 0)
+             
+
+                    stack_dict[condition] = np.dstack((stack_dict[condition], channel_data))
+    
+
 
 
 def remove_outliers(data_stack, z_score_threshold=3):
@@ -146,14 +152,13 @@ def remove_outliers(data_stack, z_score_threshold=3):
     return data_stack_filtered
 
 # Apply the function to each stack
-print(np.shape(stack_dict['Individual']))
-individual_stack = remove_outliers(stack_dict['Individual'])
+individual_stack = remove_outliers(stack_dict['Individual/Egalitarian'])
 sync_egal_stack = remove_outliers(stack_dict['Synchronous/Egalitarian'])
-leader_stack = remove_outliers(stack_dict['Synchronous/Leader'])
-follower_stack = remove_outliers(stack_dict['Synchronous/Follower'])
+leader_stack = remove_outliers(stack_dict['Synchronous/LeaderFollower'])
+follower_stack = remove_outliers(stack_dict['Synchronous/FollowerLeader'])
 complementary_sync_egal_stack = remove_outliers(stack_dict['Complementary/Egalitarian'])
-complementary_leader_stack = remove_outliers(stack_dict['Complementary/Leader'])
-complementary_follower_stack = remove_outliers(stack_dict['Complementary/Follower'])
+complementary_leader_stack = remove_outliers(stack_dict['Complementary/LeaderFollower'])
+complementary_follower_stack = remove_outliers(stack_dict['Complementary/FollowerLeader'])
 
 
 
@@ -191,7 +196,7 @@ for contrast_idx in range(num_contrasts):
         
         elif contrast_idx == 1:
             data_1 = leader_stack
-            data_2 = follower_stack
+            data_2 = sync_egal_stack
             data = [data_1.T, data_2.T]
           
         elif contrast_idx == 2:
@@ -201,7 +206,7 @@ for contrast_idx in range(num_contrasts):
            
         elif contrast_idx == 3:
             data_1 = complementary_leader_stack
-            data_2 = complementary_follower_stack
+            data_2 = complementary_sync_egal_stack
             data = [data_1.T, data_2.T]
            
         print(np.shape(data_1.T))
@@ -302,6 +307,15 @@ plt.show()
 
 
 
+
+
+
+
+
+
+
+
+
 # create_epoch_object
 pair = 1
 
@@ -325,39 +339,8 @@ decim = 2  # To reduce computation time, you can increase this number
 n_jobs = 1  # Number of parallel jobs to run. Can be increased if your machine supports it.
 
 motor_channels = ["C3", "C1", "Cz", "C2", "C4"]
-
-
-
-
-
-#motor_channels = [ "Cz"]
-
 frontal_channels = []
 
-
-
-
-power_1 = tfr_morlet(preproc_S1, freqs=freqs, n_cycles=n_cycles, use_fft=True, picks = ['Cz'],
-                    return_itc=False, decim=decim, n_jobs=n_jobs, average = True)    
-
-power_2 = tfr_morlet(preproc_S1, freqs=freqs, n_cycles=n_cycles, use_fft=True, picks = ['Cz'],
-                    return_itc=False, decim=decim, n_jobs=n_jobs, average = True)    
-
-
-
-epoch_mean = np.nanmean(stack_dict['Synchronous/Egalitarian'], axis = 2)
-freq_mean = np.nanmean(epoch_mean[8:12], axis = 0)
-beta_mean = np.nanmean(epoch_mean[28:30], axis = 0)
-
-plt.plot(freq_mean)
-plt.plot(beta_mean)
-
-epoch_mean = np.nanmean(stack_dict['Complementary/Egalitarian'], axis = 2)
-freq_mean = np.nanmean(epoch_mean[8:12], axis = 0)
-beta_mean = np.nanmean(epoch_mean[28:30], axis = 0)
-plt.plot(freq_mean)
-plt.plot(beta_mean)
-plt.show()
 
 
 
@@ -365,14 +348,13 @@ power = tfr_morlet(preproc_S1, freqs=freqs, n_cycles=n_cycles, use_fft=True, pic
                     return_itc=False, decim=decim, n_jobs=n_jobs, average = True)    
 
 
+print(np.shape(stack_dict['Synchronous/Egalitarian']))
 
-
-sync_egal_averaged = np.nanmean(stack_dict['Complementary/Egalitarian'] / stack_dict['Synchronous/Egalitarian'], axis = 2)
-
-power.data = sync_egal_averaged[np.newaxis,:,:]
-
-
+sync_egal_averaged = np.mean(stack_dict['Synchronous/LeaderFollower'], axis = 2)
+print(np.shape(sync_egal_averaged))
+power.data  = sync_egal_averaged[np.newaxis,:,:]
 power.plot(baseline=(-0.5, -0.4), tmin = -0.5, tmax = 0.5, mode='logratio', title='MEG 0211 Power')
+
 
 
 """
