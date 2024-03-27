@@ -125,7 +125,7 @@ for root, dirs, files in os.walk(connectivity_path):
 
             
          
-            
+        
 
             try:
                 individual_stack = np.dstack((individual_stack, values['Individual']))

@@ -49,7 +49,6 @@ info.set_montage(biosemi64_montage)
 
 
 
-
 # loop through all data files
 individual_stack = np.zeros((64, 44))
 sync_egal_stack = np.zeros((64, 44))
@@ -99,8 +98,7 @@ for root, dirs, files in os.walk(connectivity_path):
                 freq_bands = {'Theta': [4, 7],
                                 'Alpha': [8, 12],
                                 'Beta': [13, 30],
-                                'Gamma': [30, 45],
-                                'Beta_narrow': [18, 22]}
+                                'Gamma': [30, 45]}
                 freq_bands = OrderedDict(freq_bands)
                 # select condition and frequency band
                 event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
@@ -342,8 +340,8 @@ for root, dirs, files in os.walk(connectivity_path):
             split_name = name.split("pair")
             pair = int(split_name[1])
 
-           # if pair < 15:
-            #    continue
+            if pair > 20:
+                continue
 
             
 

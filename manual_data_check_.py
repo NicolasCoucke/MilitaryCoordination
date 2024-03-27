@@ -50,18 +50,19 @@ info2.set_montage(biosemi64_montage)
 pair = 1
 for root, dirs, files in os.walk(prep_path):
     for name in files:
-        if ('pair' in name) and ('freq' not in name) and ('manual' not in name):
+        if ('pair' in name) and ('freq' not in name) and ('manual' in name):
             print("processing file " + name)
 
             file_path = os.path.join(prep_path, name)
             # define paths
             print(file_path)
             
-            split_name = name.split("_")
+            split_name = name.split("pair_")
             pair = int(split_name[1])
 
        
-
+            if pair !=31:
+                continue
 
             with open(file_path,"rb") as input_file:
                 cleaned_epochs_AR = pickle.load(input_file)
@@ -117,8 +118,8 @@ for root, dirs, files in os.walk(prep_path):
 
             # save the data
             storepath = os.path.join(prep_path,"manual_checked_pair_" + str(pair))
-            with open(storepath, "wb") as output_file:
-                pickle.dump(cleaned_epochs_AR, output_file, protocol=pickle.HIGHEST_PROTOCOL)
+           # with open(storepath, "wb") as output_file:
+           #     pickle.dump(cleaned_epochs_AR, output_file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
             # Step 4: Reject bad epochs from both Epochs objects

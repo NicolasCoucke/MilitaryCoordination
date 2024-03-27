@@ -61,6 +61,9 @@ for i in range(len(motor_channels)):
     index = channels.index(ch_name)
     motor_channel_numbers[i] = index
 
+
+
+
 pair = 1
 for root, dirs, files in os.walk(connectivity_path):
     for name in files:
@@ -74,8 +77,8 @@ for root, dirs, files in os.walk(connectivity_path):
             split_name = name.split("pair")
             pair = int(split_name[1])
 
-           # if pair < 15:
-            #    continue
+            if pair > 20:
+                continue
 
             
 
@@ -155,6 +158,43 @@ complementary_sync_egal_stack = remove_outliers(stack_dict['Complementary/Egalit
 complementary_leader_stack = remove_outliers(stack_dict['Complementary/Leader'])
 complementary_follower_stack = remove_outliers(stack_dict['Complementary/Follower'])
 
+sync_egal_averaged = np.nanmean(stack_dict['Synchronous/Egalitarian'], axis = 2)
+
+# Define frequencies of interest
+freqs = np.arange(1, 45, 1)  # 1 to 40 Hz in 1 Hz steps
+n_cycles = freqs / 4.  # Different number of cycle per frequency
+
+# Define wavelet parameters
+decim = 2  # To reduce computation time, you can increase this number
+n_jobs = 1  # Number of parallel jobs to run. Can be increased if your machine supports it.
+
+motor_channels = ["C3", "C1", "Cz", "C2", "C4"]
+
+
+prep_path = os.path.join(path, "time locked preprocessed")
+file_path = os.path.join(prep_path, "pair_1")
+with open(file_path,"rb") as input_file:
+    cleaned_epochs_AR = pickle.load(input_file)
+
+preproc_S1 = cleaned_epochs_AR[0]
+
+
+preproc_S1 = preproc_S1['Individual']
+
+
+
+power = tfr_morlet(preproc_S1, freqs=freqs, n_cycles=n_cycles, use_fft=True, picks = ["C3", "C1", "Cz", "C2", "C4"],
+                    return_itc=False, decim=decim, n_jobs=n_jobs, average = True)    
+
+sync_egal_averaged = np.nanmean(stack_dict['Synchronous/Leader']/stack_dict['Synchronous/Follower'], axis = 2)
+
+print()
+
+power.data = sync_egal_averaged[np.newaxis,:,:]
+
+
+power.plot(baseline=(0.5, 0.7), tmin = -0.5, tmax = 0.5, mode='logratio', title='MEG 0211 Power')
+
 
 
 
@@ -208,12 +248,12 @@ for contrast_idx in range(num_contrasts):
         test = 'f oneway'
         factor_levels = 2
      
-        n_permutations = 1000
+        n_permutations = 11
         #metaconn_freq = np.tile(metaconn, (4,4))
         #ch_con_freq = scipy.sparse.csr_matrix(metaconn_freq)
 
         tail = 0
-        alpha = 0.05
+        alpha = 0.10
         #def stat_fun(*arg):
         # return(scipy.stats.f_oneway(arg[0], arg[1])[0])
 

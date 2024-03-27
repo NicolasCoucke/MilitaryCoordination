@@ -104,11 +104,13 @@ for root, dirs, files in os.walk(connectivity_path):
             skip = False
             for condition in condition_names:
                     
-                    cond_name = str(condition + '/Success/Checkpoint')
-                    print(cond_name)
-                    if cond_name not in pair_ppc_values.keys():
-                        print('skip')
-                        skip = True
+                cond_name = str(condition + '/Success/Checkpoint/2')
+                #print(cond_name)
+                #print(pair_ppc_values.keys())
+                
+                if cond_name not in pair_ppc_values.keys():
+                    skip = True
+                    
             if skip:
                 continue
 
@@ -117,7 +119,7 @@ for root, dirs, files in os.walk(connectivity_path):
 
             for condition in condition_names:
 
-                    cond_name = str(condition + '/Success/Checkpoint')
+                    cond_name = str(condition + '/Success/Checkpoint/2')
                     condition_data = pair_ppc_values[cond_name]
                     
                     channel_data = np.mean(condition_data[motor_channel_numbers,:,:], axis = 0)
@@ -213,7 +215,7 @@ for contrast_idx in range(num_contrasts):
         test = 'f oneway'
         factor_levels = 2
      
-        n_permutations = 1000
+        n_permutations = 11
         #metaconn_freq = np.tile(metaconn, (4,4))
         #ch_con_freq = scipy.sparse.csr_matrix(metaconn_freq)
 
@@ -232,7 +234,7 @@ for contrast_idx in range(num_contrasts):
                                                                                         t_power=1,
                                                                                         threshold = 2,
                                                                                         out_type='mask')
-        significance_level = 0.05
+        significance_level = 0.10
         significant_clusters = cluster_p_values < significance_level
 
         # Define significance level
