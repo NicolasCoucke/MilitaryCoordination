@@ -45,10 +45,12 @@ complementary_leader_stack = np.zeros((44,512))
 complementary_follower_stack = np.zeros((44,512))
 
 stack_dict = dict()
+military_stack_dict = dict()
 condition_names = ['Synchronous/Egalitarian', 'Synchronous/LeaderFollower', 'Synchronous/FollowerLeader', 'Individual/Egalitarian', 'Complementary/Egalitarian', 'Complementary/LeaderFollower', 'Complementary/FollowerLeader']
 for condition in condition_names:
     condition_stack = np.zeros((44,512))    
     stack_dict[condition] = condition_stack
+    military_stack_dict[condition] = condition_stack
 
 biosemi64_montage = mne.channels.make_standard_montage('biosemi64')
 # change the channel names in our epochs so that they are the same as the montage
@@ -74,7 +76,7 @@ for root, dirs, files in os.walk(connectivity_path):
             split_name = name.split("pair_")
             pair = int(split_name[1])
 
-           # if pair < 15:
+           
             #    continue
 
             
@@ -95,8 +97,7 @@ for root, dirs, files in os.walk(connectivity_path):
             freq_bands = {'Theta': [4, 7],
                             'Alpha': [8, 12],
                             'Beta': [13, 30],
-                            'Gamma': [30, 45],
-                            'Beta_narrow': [18, 22]}
+                            'Gamma': [30, 45]}
             freq_bands = OrderedDict(freq_bands)
             # select condition and frequency band
             event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
@@ -104,9 +105,8 @@ for root, dirs, files in os.walk(connectivity_path):
             skip = False
             for condition in condition_names:
                     
-                cond_name = str(condition + '/Success/Checkpoint/2')
-                #print(cond_name)
-                #print(pair_ppc_values.keys())
+                cond_name = str(condition + '/Success/Checkpoint')
+
                 
                 if cond_name not in pair_ppc_values.keys():
                     skip = True
@@ -119,13 +119,15 @@ for root, dirs, files in os.walk(connectivity_path):
 
             for condition in condition_names:
 
-                    cond_name = str(condition + '/Success/Checkpoint/2')
+                    cond_name = str(condition + '/Success/Checkpoint')
                     condition_data = pair_ppc_values[cond_name]
                     
                     channel_data = np.mean(condition_data[motor_channel_numbers,:,:], axis = 0)
              
-
-                    stack_dict[condition] = np.dstack((stack_dict[condition], channel_data))
+                    if pair > 4:
+                        stack_dict[condition] = np.dstack((stack_dict[condition], channel_data))
+                    else:
+                        military_stack_dict[condition] = np.dstack((stack_dict[condition], channel_data))
     
 
 
@@ -161,6 +163,76 @@ follower_stack = remove_outliers(stack_dict['Synchronous/FollowerLeader'])
 complementary_sync_egal_stack = remove_outliers(stack_dict['Complementary/Egalitarian'])
 complementary_leader_stack = remove_outliers(stack_dict['Complementary/LeaderFollower'])
 complementary_follower_stack = remove_outliers(stack_dict['Complementary/FollowerLeader'])
+
+military_individual_stack = remove_outliers(military_stack_dict['Individual/Egalitarian'])
+military_sync_egal_stack = remove_outliers(military_stack_dict['Synchronous/Egalitarian'])
+military_leader_stack = remove_outliers(military_stack_dict['Synchronous/LeaderFollower'])
+military_follower_stack = remove_outliers(military_stack_dict['Synchronous/FollowerLeader'])
+military_complementary_sync_egal_stack = remove_outliers(military_stack_dict['Complementary/Egalitarian'])
+military_complementary_leader_stack = remove_outliers(military_stack_dict['Complementary/LeaderFollower'])
+military_complementary_follower_stack = remove_outliers(military_stack_dict['Complementary/FollowerLeader'])
+
+def get_t_time_series(condition_1_stack, condition_2_stack):
+    """
+    input should be time x num samples
+    """
+    length = np.size(condition_1_stack, 0)
+    t_scores = np.zeros((length,))
+    for i in range(length):
+        print(np.shape(condition_1_stack[i,:]))
+        t_scores[i] = ttest_rel(np.array(condition_1_stack[i,:]), np.array(condition_2_stack[i,:]))
+
+
+    return t_scores
+
+baseline_indices = range(358,461)
+baseline_indices_comp = range(103,206)
+for i in range(np.size(sync_egal_stack, 2)):
+    for freq in range(np.size(sync_egal_stack, 0)):
+        sync_egal_stack[freq,:,i]-= np.nanmean(sync_egal_stack[freq,baseline_indices,i])
+        individual_stack[freq,:,i] -= np.nanmean(individual_stack[freq,baseline_indices,i])
+
+
+for freq_key, freq_values in freq_bands.items():
+    stack_1 = np.nanmean(sync_egal_stack[freq_values[0]:freq_values[1], 103:358,:], axis = 0)
+    stack_2 = np.nanmean(individual_stack[freq_values[0]:freq_values[1], 103:358,:], axis = 0)
+    t_scores, p_value=  ttest_rel(stack_1, stack_2, axis = 1, nan_policy = 'omit')
+    print(np.shape(t_scores))
+    plt.plot(t_scores)
+    plt.legend(freq_bands.keys())
+plt.axvline(x = 103, color = 'black')
+plt.axvline(x = 154, linestyle = '--', color = 'black')
+plt.show()
+
+for freq_key, freq_values in freq_bands.items():
+    stack_1 = np.nanmean(military_complementary_sync_egal_stack[freq_values[0]:freq_values[1], 103:358,:], axis = 0)
+    stack_2 = np.nanmean(military_sync_egal_stack[freq_values[0]:freq_values[1], 103:358,:], axis = 0)
+    t_scores, p_value=  ttest_rel(stack_1, stack_2, axis = 1, nan_policy = 'omit')
+    print(np.shape(t_scores))
+    plt.plot(t_scores)
+    plt.legend(freq_bands.keys())
+plt.axvline(x = 103, color = 'black')
+plt.axvline(x = 154, linestyle = '--', color = 'black')
+plt.show()
+
+
+
+baseline_indices = range(358,461)
+baseline_indices_comp = range(103,206)
+for i in range(np.size(sync_egal_stack, 2)):
+    for freq in range(np.size(sync_egal_stack, 0)):
+        sync_egal_stack[freq,:,i] = 10*np.log10(sync_egal_stack[freq,:,i] / np.mean(individual_stack[freq,:,i]))
+
+for freq_key, freq_values in freq_bands.items():
+    
+    print(np.shape(sync_egal_stack))
+    egal_mean = np.nanmean(sync_egal_stack, axis = 2)
+    print(np.shape(egal_mean))
+    plt.plot(np.nanmean(egal_mean[freq_values[0]:freq_values[1], 103:358], axis = 0), linestyle = '--')
+    plt.legend(freq_bands.keys())
+plt.show()
+
+
 
 
 

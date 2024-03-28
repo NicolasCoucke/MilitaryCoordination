@@ -304,8 +304,8 @@ def calculate_connectivity(pair):
                                 X = signal_1[epoch, channel, freq, :]
                                 Y = signal_2[epoch, channel, freq, :]
 
-                                X = np.pad(X, (103, 0), 'constant')
-                                Y = np.pad(Y, (103, 0), 'constant')
+                                X = np.pad(X, (128, 0), 'constant')
+                                Y = np.pad(Y, (128, 0), 'constant')
 
                                 phase_A = np.angle(X)
                                 phase_B = np.angle(Y)
@@ -316,7 +316,7 @@ def calculate_connectivity(pair):
                                 
                                 # Define parameters
                                 n = len(phase_diff)
-                                window_size = 103
+                                window_size = 128
                                 num_points = n - window_size  # Adjust for zero-padding
 
                             # Initialize an empty matrix to hold all windows

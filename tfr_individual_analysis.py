@@ -97,8 +97,7 @@ for root, dirs, files in os.walk(connectivity_path):
                 freq_bands = {'Theta': [4, 7],
                                 'Alpha': [8, 12],
                                 'Beta': [13, 30],
-                                'Gamma': [30, 45],
-                                'Beta_narrow': [18, 22]}
+                                'Gamma': [30, 45]}
                 freq_bands = OrderedDict(freq_bands)
                 # select condition and frequency band
                 event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
@@ -157,6 +156,28 @@ follower_stack = remove_outliers(stack_dict['Synchronous/Follower'])
 complementary_sync_egal_stack = remove_outliers(stack_dict['Complementary/Egalitarian'])
 complementary_leader_stack = remove_outliers(stack_dict['Complementary/Leader'])
 complementary_follower_stack = remove_outliers(stack_dict['Complementary/Follower'])
+
+#sync_egal_stack = complementary_sync_egal_stack
+# baseline per participant
+baseline_indices = range(358,461)
+baseline_indices_comp = range(103,206)
+for i in range(np.size(sync_egal_stack, 2)):
+    for freq in range(np.size(sync_egal_stack, 0)):
+        sync_egal_stack[freq,:,i] = 10*np.log10(individual_stack[freq,:,i] / np.mean(individual_stack[freq,:,i]))
+
+
+for freq_key, freq_values in freq_bands.items():
+    
+    print(np.shape(sync_egal_stack))
+    egal_mean = np.nanmean(sync_egal_stack, axis = 2)
+    print(np.shape(egal_mean))
+    plt.plot(np.nanmean(egal_mean[freq_values[0]:freq_values[1], 103:358], axis = 0))
+    plt.legend(freq_bands.keys())
+plt.axvline(x = 103, color = 'black')
+plt.axvline(x = 154, linestyle = '--', color = 'black')
+plt.show()
+
+
 
 sync_egal_averaged = np.nanmean(stack_dict['Synchronous/Egalitarian'], axis = 2)
 

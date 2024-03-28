@@ -105,7 +105,7 @@ for root, dirs, files in os.walk(connectivity_path):
             with open(file_path,"rb") as input_file:
                 imcoh_values, ppc_values = pickle.load(input_file)
 
-            values = apply_fisher_z_transform(ppc_values)
+            values = apply_fisher_z_transform(imcoh_values)
 
             
             #print(participant_power_values )
@@ -121,32 +121,33 @@ for root, dirs, files in os.walk(connectivity_path):
             freq_bands = OrderedDict(freq_bands)
             # select condition and frequency band
             event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
-            print(values.keys())
+           
 
             
-         
+            if len(values.keys()) != 7:
+                continue
         
 
             try:
-                individual_stack = np.dstack((individual_stack, values['Individual']))
-                sync_egal_stack = np.dstack((sync_egal_stack , values['Synchronous/Egalitarian']))
+                individual_stack = np.dstack((individual_stack, values['Individual/Egalitarian/Success/Checkpoint']))
+                sync_egal_stack = np.dstack((sync_egal_stack , values['Synchronous/Egalitarian/Success/Checkpoint']))
 
 
                 try:
-                    leader_stack = np.dstack((leader_stack , values['Synchronous/LeaderFollower']))
+                    leader_stack = np.dstack((leader_stack , values['Synchronous/LeaderFollower/Success/Checkpoint']))
                 except:
-                    leader_stack = np.dstack((leader_stack , values['Synchronous/FollowerLeader']))
+                    leader_stack = np.dstack((leader_stack , values['Synchronous/FollowerLeader/Success/Checkpoint']))
 
             
-                complementary_sync_egal_stack = np.dstack((complementary_sync_egal_stack , values['Complementary/Egalitarian']))
+                complementary_sync_egal_stack = np.dstack((complementary_sync_egal_stack , values['Complementary/Egalitarian/Success/Checkpoint']))
             
                 try:
-                    complementary_leader_stack = np.dstack((complementary_leader_stack , values['Complementary/LeaderFollower']))
+                    complementary_leader_stack = np.dstack((complementary_leader_stack , values['Complementary/LeaderFollower/Success/Checkpoint']))
                 except:
-                    complementary_leader_stack = np.dstack((complementary_follower_stack , values['Complementary/FollowerLeader']))
+                    complementary_leader_stack = np.dstack((complementary_follower_stack , values['Complementary/FollowerLeader/Success/Checkpoint']))
             except:
                 continue
-
+            print('worked')
            
 
 
@@ -195,12 +196,14 @@ adjacency,_ = mne.channels.find_ch_adjacency(info, 'eeg')
 freq_bands = {'Theta': [4, 7],
                 'Alpha': [8, 12],
                 'Beta': [13, 30],
-                'Gamma': [30, 45],
-                'Beta_narrow': [18, 22]}
+                'Gamma': [30, 45]}
 # Create a figure with a grid of subplots
 fig, axs = plt.subplots(num_contrasts, num_freq_bands, figsize=(20, 15))
 fig.subplots_adjust(hspace=0.4, wspace=0.4)  # Adjust spacing between plots
 # Iterate over each contrast and frequency band to create and plot Evoked objects
+
+
+
 for contrast_idx in range(num_contrasts):
    
     for i, freq_band in enumerate(freq_bands.values()):
@@ -210,23 +213,22 @@ for contrast_idx in range(num_contrasts):
         ax = axs[contrast_idx, i]
         
       
-        data_1 = stack_dict[contrast_idx][0]
-        data_2 = stack_dict[contrast_idx][1]
+        #data_1 = stack_dict[contrast_idx][0]
+        #data_2 = stack_dict[contrast_idx][1]
 
 
-        data = [np.mean(data_1[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.mean(data_2[:,freq_band[0]:freq_band[1],:], axis = 1).T]
-
+       # data = [np.mean(data_1[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.mean(data_2[:,freq_band[0]:freq_band[1],:], axis = 1).T]
         if contrast_idx == 0:
-            data = [sync_egal_stack[:,freq_band,:].T, individual_stack[:,freq_band,:].T]
+            data = [np.nanmean(sync_egal_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.nanmean(individual_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T]
         
         elif contrast_idx == 1:
-            data = [leader_stack[:,freq_band,:].T, sync_egal_stack[:,freq_band,:].T]
+            data = [np.nanmean(leader_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.nanmean(sync_egal_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T]
           
         elif contrast_idx == 2:
-            data = [complementary_sync_egal_stack[:,freq_band,:].T, sync_egal_stack[:,freq_band,:].T]
+            data = [np.nanmean(complementary_sync_egal_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.nanmean(sync_egal_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T]
            
         elif contrast_idx == 3:
-            data = [complementary_leader_stack[:,freq_band,:].T, complementary_sync_egal_stack[:,freq_band,:].T]
+            data = [np.nanmean(complementary_leader_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.nanmean(complementary_sync_egal_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T]
            
 
         test = 'f oneway'
@@ -252,6 +254,8 @@ for contrast_idx in range(num_contrasts):
                                                                                         t_power=1,
                                                                                         threshold = 2,
                                                                                         out_type='mask')
+        print(np.shape(Stat_obs))
+
         significance_level = 0.05
         significant_clusters = cluster_p_values < significance_level
 
@@ -284,6 +288,21 @@ for contrast_idx in range(num_contrasts):
 
         # Show the complete figure
 plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
