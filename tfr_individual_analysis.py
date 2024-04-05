@@ -45,7 +45,7 @@ complementary_leader_stack = np.zeros((44,512))
 complementary_follower_stack = np.zeros((44,512))
 
 stack_dict = dict()
-condition_names = ['Synchronous/Egalitarian', 'Synchronous/Leader', 'Synchronous/Follower', 'Individual', 'Complementary/Egalitarian', 'Complementary/Leader', 'Complementary/Follower']
+condition_names = ['Synchronous/Egalitarian', 'Synchronous/Leader', 'Synchronous/Follower', 'Complementary/Egalitarian', 'Complementary/Leader', 'Complementary/Follower', 'Start'] #'Individual'
 for condition in condition_names:
     condition_stack = np.zeros((44,512))    
     stack_dict[condition] = condition_stack
@@ -101,7 +101,6 @@ for root, dirs, files in os.walk(connectivity_path):
                 freq_bands = OrderedDict(freq_bands)
                 # select condition and frequency band
                 event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
-
                 skip = False
                 for condition in condition_names:
                         if condition not in participant_power_values.keys():
@@ -148,8 +147,7 @@ def remove_outliers(data_stack, z_score_threshold=3):
     return data_stack_filtered
 
 # Apply the function to each stack
-print(np.shape(stack_dict['Individual']))
-individual_stack = remove_outliers(stack_dict['Individual'])
+individual_stack = remove_outliers(stack_dict['Start'])
 sync_egal_stack = remove_outliers(stack_dict['Synchronous/Egalitarian'])
 leader_stack = remove_outliers(stack_dict['Synchronous/Leader'])
 follower_stack = remove_outliers(stack_dict['Synchronous/Follower'])
@@ -163,16 +161,30 @@ baseline_indices = range(358,461)
 baseline_indices_comp = range(103,206)
 for i in range(np.size(sync_egal_stack, 2)):
     for freq in range(np.size(sync_egal_stack, 0)):
-        sync_egal_stack[freq,:,i] = 10*np.log10(individual_stack[freq,:,i] / np.mean(individual_stack[freq,:,i]))
+        sync_egal_stack[freq,:,i] = 10*np.log10(sync_egal_stack[freq,:,i] / np.mean(individual_stack[freq,:,i]))
 
+for i in range(np.size(sync_egal_stack, 2)):
+    for freq in range(np.size(sync_egal_stack, 0)):
+        complementary_sync_egal_stack[freq,:,i] = 10*np.log10(complementary_sync_egal_stack[freq,:,i] / np.mean(individual_stack[freq,:,i]))
+
+egal_mean = np.nanmean(sync_egal_stack, axis = 2)
+complementary_egal_mean = np.nanmean(complementary_sync_egal_stack, axis = 2)
+for freq_key, freq_values in freq_bands.items():
+    
+    print(np.shape(sync_egal_stack))
+    print(np.shape(egal_mean))
+    plt.plot(np.nanmean(egal_mean[freq_values[0]:freq_values[1], 128:383], axis = 0))
+
+
+plt.legend(freq_bands.keys())
 
 for freq_key, freq_values in freq_bands.items():
     
     print(np.shape(sync_egal_stack))
-    egal_mean = np.nanmean(sync_egal_stack, axis = 2)
     print(np.shape(egal_mean))
-    plt.plot(np.nanmean(egal_mean[freq_values[0]:freq_values[1], 103:358], axis = 0))
-    plt.legend(freq_bands.keys())
+    plt.plot(np.nanmean(complementary_egal_mean[freq_values[0]:freq_values[1], 128:383], axis = 0), linestyle = '--')
+
+
 plt.axvline(x = 103, color = 'black')
 plt.axvline(x = 154, linestyle = '--', color = 'black')
 plt.show()

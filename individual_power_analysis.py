@@ -388,13 +388,13 @@ for root, dirs, files in os.walk(connectivity_path):
                                 condition_data_2 = participant_power_values['Individual']
                             elif contrast == 1:
                                 condition_data_1 = participant_power_values['Synchronous/Leader']
-                                condition_data_2 = participant_power_values['Synchronous/Follower']
+                                condition_data_2 = participant_power_values['Individual']
                             elif contrast == 2:
                                 condition_data_1 = participant_power_values['Complementary/Egalitarian']
-                                condition_data_2 = participant_power_values['Synchronous/Egalitarian']
+                                condition_data_2 = participant_power_values['Individual']
                             elif contrast == 3:
                                 condition_data_1 = participant_power_values['Complementary/Leader']
-                                condition_data_2 = participant_power_values['Complementary/Follower']
+                                condition_data_2 = participant_power_values['Individual']
                             
                             # average over time
                             condition_data_1 = np.mean(condition_data_1, axis = 2)

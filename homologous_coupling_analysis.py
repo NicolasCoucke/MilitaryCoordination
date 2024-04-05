@@ -222,13 +222,13 @@ for contrast_idx in range(num_contrasts):
             data = [np.nanmean(sync_egal_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.nanmean(individual_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T]
         
         elif contrast_idx == 1:
-            data = [np.nanmean(leader_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.nanmean(sync_egal_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T]
+            data = [np.nanmean(leader_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.nanmean(individual_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T]
           
         elif contrast_idx == 2:
-            data = [np.nanmean(complementary_sync_egal_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.nanmean(sync_egal_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T]
+            data = [np.nanmean(complementary_sync_egal_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.nanmean(individual_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T]
            
         elif contrast_idx == 3:
-            data = [np.nanmean(complementary_leader_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.nanmean(complementary_sync_egal_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T]
+            data = [np.nanmean(complementary_leader_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T, np.nanmean(individual_stack[:,freq_band[0]:freq_band[1],:], axis = 1).T]
            
 
         test = 'f oneway'

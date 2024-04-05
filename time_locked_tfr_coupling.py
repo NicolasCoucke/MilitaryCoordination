@@ -84,12 +84,13 @@ def calculate_connectivity(pair):
                 event_id = preproc_S1.event_id
             # print(event_id)
 
+            
                 # Assuming `event_id` is your dictionary of event IDs
-                filtered_event_id = {key: value for key, value in event_id.items() if 'Success/Checkpoint' in key}
+                filtered_event_id = {key: value for key, value in event_id.items() if ((('Synchronous' in key) and ('Success/Checkpoint' in key)) or (('Individual' in key) and ('Success/Checkpoint' in key)) or ('Success/Start' in key) or ('Success/Desyncpoint' in key)) }
                 
                 # Print the filtered event IDs
-                #print(filtered_event_id)
-
+                for key in filtered_event_id.keys():
+                    print(key)
 
                 preproc_S1 = preproc_S1[list(filtered_event_id.keys())]
                 preproc_S2 = preproc_S2[list(filtered_event_id.keys())]
@@ -126,7 +127,7 @@ def calculate_connectivity(pair):
                 new_event_ids = []
                 for name in filtered_event_id.keys():
                     new_event_ids.append(name.rsplit('/', 1)[0])
-
+                print(new_event_ids)
             
                 power_1 = tfr_morlet(preproc_S1, freqs=freqs, n_cycles=n_cycles, use_fft=True,
                                     return_itc=False, output = "complex", decim=decim, n_jobs=n_jobs, average = False)    
@@ -139,7 +140,9 @@ def calculate_connectivity(pair):
                     try:
                         # store a version that is averaged over epochs but not yet over channels or time
                         # so it can be used both to plot average scalp power and to plot individual tfr
+
                         average_powers_1 = np.mean(np.abs(power_1[condition].data)**2, axis = 0)
+
                         average_powers_2 = np.mean(np.abs(power_2[condition].data)**2, axis = 0)
                     
                     except: 
@@ -149,28 +152,33 @@ def calculate_connectivity(pair):
                 
 
 
-                    if 'Synchronous/LeaderFollower' in condition:
+                    if 'Synchronous/LeaderFollower/Success/Checkpoint' in condition:
                         participant_1_power_values['Synchronous/Leader'] = average_powers_1
                         participant_2_power_values['Synchronous/Follower'] = average_powers_2
-                    elif 'Synchronous/FollowerLeader' in condition:
+                    elif 'Synchronous/FollowerLeader/Success/Checkpoint' in condition:
                         participant_1_power_values['Synchronous/Follower'] = average_powers_1
                         participant_2_power_values['Synchronous/Leader'] = average_powers_2
-                    elif 'Complementary/LeaderFollower' in condition:
+                    elif 'Complementary/LeaderFollower/Success/Desyncpoint' in condition:
                         participant_1_power_values['Complementary/Leader'] = average_powers_1
                         participant_2_power_values['Complementary/Follower'] = average_powers_2
-                    elif 'Complementary/FollowerLeader' in condition:
+                    elif 'Complementary/FollowerLeader/Success/Desyncpoint' in condition:
                         participant_1_power_values['Complementary/Follower'] = average_powers_1
                         participant_2_power_values['Complementary/Leader'] = average_powers_2
-                    elif 'Synchronous/Egalitarian' in condition:
+                    elif 'Synchronous/Egalitarian/Success/Checkpoint' in condition:
                         participant_1_power_values['Synchronous/Egalitarian'] = average_powers_1
                         participant_2_power_values['Synchronous/Egalitarian'] = average_powers_2
-                    elif 'Complementary/Egalitarian' in condition:
+                    elif 'Complementary/Egalitarian/Success/Desyncpoint' in condition:
                         participant_1_power_values['Complementary/Egalitarian'] = average_powers_1
                         participant_2_power_values['Complementary/Egalitarian'] = average_powers_2
-                    elif 'Individual' in condition:
+                    elif 'Individual/Egalitarian/Success/Checkpoint' in condition:
                         participant_1_power_values['Individual'] = average_powers_1
                         participant_2_power_values['Individual'] = average_powers_2
+                    elif 'Start' in condition:
+                        participant_1_power_values['Start'] = average_powers_1
+                        participant_2_power_values['Start'] = average_powers_2
 
+                print(participant_1_power_values.keys())
+               
             
                 storepath = os.path.join(connectivity_path, 'individual_tfr_pair'+ str(pair))
                 with open(storepath, "wb") as output_file: 
@@ -346,8 +354,6 @@ def calculate_connectivity(pair):
                 storepath = os.path.join(connectivity_path, 'homologous_tfr_pair_'+ str(pair))
                 with open(storepath, "wb") as output_file: 
                     pickle.dump(pair_trf_synchrony, output_file, protocol=pickle.HIGHEST_PROTOCOL)
-
-
 
 try:
     if __name__ == '__main__':
