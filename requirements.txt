@@ -2,10 +2,10 @@ h5py
 matplotlib
 numpy
 scipy
-#mne
+mne
 #hypyp
 #ipykernel
-#os
-#io
-#autoreject
-pickle
+os
+io
+autoreject
+#pickle

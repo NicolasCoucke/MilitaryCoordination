@@ -16,6 +16,7 @@ from mne_icalabel import label_components
 import scipy
 import scipy.signal as signal
 import scipy.stats
+import pandas as pd
 #from astropy.stats import circmean
 
 
@@ -259,6 +260,11 @@ def link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq):
     eeg trials that did not find a match are labeled as nan
     the 'labels' are stored in the fourth column of the updated_trials matrix
     together with the condition number, these labels can then be used to link behavioral and eeg
+
+    the trials matrix has the following 4 columns
+    
+    begin_sample, end_sample, eeg_trigger_index, eeg_trigger_value, trial_success
+
     """
 
 
@@ -314,25 +320,37 @@ def link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq):
         eeg_index = 0
         fail_counter = 0
         eeg_indices_for_trials = np.zeros((20,))
+
+        summary_for_condition = np.zeros((20, 6))
+        summary_for_condition[:] = np.nan
+
         for trial in range(1, 21):
+
+            summary_for_condition[trial-1,0] = trial
+
             if np.size(condition_sements, 0) == eeg_index:
                 break  
 
-            # Iterate through each trial number
+            # Iterate through each trial number of the behavioral data
             for index, row in filtered_data.iterrows():
+
                 # Check if the trial number matches the current trial in the loop
                 if int(row['trial']) == trial:
                     # If a matching trial is found, print its completion time
-                    completion_time = np.min([len(row['phase2'])/100, len(row['phase1'])/100])
-                
-                    eeg_time = (condition_sements[eeg_index,1] - condition_sements[eeg_index,0])/sfreq
-            
+                    completion_time = np.max([len(row['phase2'])/100, len(row['phase1'])/100])
+                    summary_for_condition[trial-1,1] = completion_time
 
+                    # then get the trial duration of what should be the corresponding eeg trial
+                    eeg_time = (condition_sements[eeg_index,1] - condition_sements[eeg_index,0])/sfreq
+                    summary_for_condition[trial-1,2] = eeg_index
+                    summary_for_condition[trial-1,3] = eeg_time
+                    # why this? Because it is training? or solo?
                     if value == 5:
                         eeg_indices_for_trials[trial-1] = eeg_index
                         #print(f" trial {trial} | behavioral: {completion_time} | EEG: {eeg_time}")
                         continue
-
+                    
+                    # if the durations match and also the index is not yet used, then add it to the indices 
                     if np.abs(eeg_time - completion_time) < 0.1:
                         
                         if eeg_index not in eeg_indices_for_trials:
@@ -344,7 +362,7 @@ def link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq):
                             #print(f" trial {trial} | behavioral: {completion_time} | EEG: {0}")
                     else:
                         # case when there is one eeg too many
-                        
+                        # if the duration doesnt match for example 
                         next_eeg_index = eeg_index+1
                         if np.size(condition_sements, 0) == next_eeg_index:
                             eeg_indices_for_trials[trial-1] = np.nan
@@ -353,6 +371,8 @@ def link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq):
                         next_eeg_time = (condition_sements[next_eeg_index,1] - condition_sements[next_eeg_index,0])/sfreq
                         if np.abs(next_eeg_time - completion_time) < 0.1:
                             eeg_indices_for_trials[trial-1] = next_eeg_index
+                            summary_for_condition[trial-1,2] = next_eeg_index
+                            summary_for_condition[trial-1,3] = next_eeg_time
                             #print(f" trial {trial} | behavioral: {completion_time} | EEG: {next_eeg_time}")
                         else:
                             # case where there is no eeg for the behavioral data
@@ -361,20 +381,220 @@ def link_eeg_to_behavioral_trials(trials, data_dictionary, pair, sfreq):
                             #print(f" trial {trial} | behavioral: {completion_time} | EEG: {0}")
                             fail_counter+= 1
                             if fail_counter < 2:
-                                eeg_index-=1                  
+                                eeg_index-=1   
+
+
 
                     
             eeg_index+=1
         #print(eeg_indices_for_trials)
         # now we have the indices and we use them to find the trialcounter values that we wanted
         # and then next to the trialcounter values in the original trials object we put the trialnumber values
-    
+
+        print(summary_for_condition)
+
         for i in range(1, 21):
             eeg_index = eeg_indices_for_trials[i-1]
             if not np.isnan(eeg_index):
+                
+                # get the trial (eeg trigger) that corresponds to the trial
                 trialcounter = condition_sements[int(eeg_index),2]
                 #print(trialcounter)
+
+                # in the updated trials, add the trialnumber on the 4th position
                 updated_trials[np.where(updated_trials[:,2] == trialcounter)[0],4] = i
+
+    return updated_trials
+
+
+
+def link_eeg_to_behavioral_trials_via_excel(trials, data_dictionary, pair, sfreq, excel_writer):
+    """
+    Updates the function to save the summary_for_condition matrix for each condition in an Excel file.
+    The condition name is placed above each matrix, and pair information is included for each entry.
+    """
+    
+    successes = np.array(trials[:,4], dtype=int)
+    segments = trials[successes == 1, :]
+    updated_trials = segments
+    updated_trials[:, 4] = np.nan
+
+    event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 
+                'Synchronous/FollowerLeader': 4, 'Individual': 5, 
+                'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 
+                'Complementary/FollowerLeader': 8}
+    
+    if 'Sheet1' not in excel_writer.book.sheetnames:
+        excel_writer.book.create_sheet('Sheet1')
+
+    start_row = excel_writer.sheets['Sheet1'].max_row + 1 if excel_writer.sheets['Sheet1'].max_row > 0 else 0
+
+     
+    
+    for key, value in event_id.items():
+        print(key)
+        
+        condition_segments = segments[segments[:, 3] == value]
+        
+        if np.size(condition_segments, 0) == 0:
+            continue
+        
+        sync = value in [2, 3, 4, 5]
+        hierarchy = value in [3, 4, 7, 8]
+        interactive = value != 5
+        who_leader = 1 if value in [3, 7] else 2 if value in [4, 8] else 0
+
+        filtered_data = data_dictionary[(data_dictionary['pair'] == pair) &
+                                        (data_dictionary['sync'] == sync) & 
+                                        (data_dictionary['hierarchy'] == hierarchy) & 
+                                        (data_dictionary['who_leader'] == who_leader) & 
+                                        (data_dictionary['interactive'] == interactive)]
+        
+        eeg_index = 0
+        summary_for_condition = np.zeros((20, 6))
+        summary_for_condition[:] = np.nan
+
+        for trial in range(1, 21):
+            summary_for_condition[trial-1, 0] = trial
+
+            if np.size(condition_segments, 0) <= eeg_index:
+                continue
+
+            for index, row in filtered_data.iterrows():
+                if int(row['trial']) == trial:
+                    completion_time = np.max([len(row['phase2'])/100, len(row['phase1'])/100])
+                    summary_for_condition[trial-1, 1] = completion_time
+                    eeg_time = (condition_segments[eeg_index, 1] - condition_segments[eeg_index, 0]) / sfreq
+                    summary_for_condition[trial-1, 2] = eeg_index
+                    summary_for_condition[trial-1, 3] = eeg_time
+
+            eeg_index += 1
+
+        # Convert the matrix and associated metadata to a DataFrame
+        df_condition = pd.DataFrame(summary_for_condition, columns=["Trial", "CompletionTime", "EEGIndex", "EEGTime", "Col5", "Col6"])
+        df_condition.insert(0, 'Condition', key)
+        df_condition.insert(0, 'Pair', pair)
+        
+        # Write the condition name, pair, and data to the Excel sheet
+        df_condition.to_excel(excel_writer, sheet_name='Sheet1', startrow=start_row, index=False)
+        start_row += len(df_condition) + 2  # Adjust row position for next condition (including space for a blank row)
+    
+    return updated_trials
+
+
+
+
+def link_eeg_to_behavioral_trials_read_from_excel(trials, excel_path, pair, sfreq):
+    """
+    Function to link EEG trials to behavioral trials using data from a preprocessed Excel file.
+    
+    Parameters:
+    - trials: numpy array containing EEG trial data with columns: [begin_sample, end_sample, eeg_trigger_index, eeg_trigger_value, trial_success]
+    - excel_path: Path to the Excel file containing the preprocessed behavioral data.
+    - pair: Identifier for the current pair being processed.
+    - sfreq: Sampling frequency of the EEG data.
+    
+    Returns:
+    - updated_trials: numpy array similar to 'trials' with an additional column linking EEG data to behavioral trial numbers.
+    """
+
+    # Read the Excel file to get the behavioral data for the specific pair
+    df = pd.read_excel(excel_path, sheet_name='Sheet1')
+    
+    # Filter the data for the specific pair
+    pair_data = df[df['Pair'] == pair]
+
+    successes = np.array(trials[:, 4], dtype=int)
+    segments = trials[successes == 1, :]
+    updated_trials = segments.copy()
+    updated_trials[:, 4] = np.nan
+
+    # Iterate through the conditions as specified in the Excel data
+    conditions = pair_data['Condition'].unique()
+
+    for condition in conditions:
+        condition_data = pair_data[pair_data['Condition'] == condition]
+        
+        event_id = condition_data.iloc[0]['EEGIndex']
+        condition_segments = segments[segments[:, 3] == event_id]
+
+        if condition_segments.size == 0:
+            continue
+
+        # Loop through each row in the condition data
+        for idx, row in condition_data.iterrows():
+            trial_number = int(row['Trial'])
+            completion_time = row['CompletionTime']
+            eeg_index = int(row['EEGIndex'])
+
+            if np.isnan(eeg_index) or eeg_index >= len(condition_segments):
+                continue
+
+            # Calculate the EEG time
+            eeg_time = (condition_segments[eeg_index, 1] - condition_segments[eeg_index, 0]) / sfreq
+
+            # Check if the EEG time matches the completion time within a threshold
+            if np.abs(eeg_time - completion_time) < 0.1:
+                trialcounter = condition_segments[eeg_index, 2]
+                updated_trials[np.where(updated_trials[:, 2] == trialcounter)[0], 4] = trial_number
+
+    return updated_trials
+
+
+
+def add_samples_to_behavioral_trials_from_excel(trials, excel_path, pair, sfreq):
+    """
+    Function to link EEG trials to behavioral trials using data from a preprocessed Excel file.
+    
+    Parameters:
+    - trials: numpy array containing EEG trial data with columns: [begin_sample, end_sample, eeg_trigger_index, eeg_trigger_value, trial_success]
+    - excel_path: Path to the Excel file containing the preprocessed behavioral data.
+    - pair: Identifier for the current pair being processed.
+    - sfreq: Sampling frequency of the EEG data.
+    
+    Returns:
+    - updated_trials: numpy array similar to 'trials' with an additional column linking EEG data to behavioral trial numbers.
+    """
+
+    # Read the Excel file to get the behavioral data for the specific pair
+    df = pd.read_excel(excel_path, sheet_name='Sheet1')
+    
+    # Filter the data for the specific pair
+    pair_data = df[df['Pair'] == pair]
+
+    successes = np.array(trials[:, 4], dtype=int)
+    segments = trials[successes == 1, :]
+    updated_trials = segments.copy()
+    updated_trials[:, 4] = np.nan
+
+    # Iterate through the conditions as specified in the Excel data
+    conditions = pair_data['Condition'].unique()
+
+    for condition in conditions:
+        condition_data = pair_data[pair_data['Condition'] == condition]
+        
+        event_id = condition_data.iloc[0]['EEGIndex']
+        condition_segments = segments[segments[:, 3] == event_id]
+
+        if condition_segments.size == 0:
+            continue
+
+        # Loop through each row in the condition data
+        for idx, row in condition_data.iterrows():
+            trial_number = int(row['Trial'])
+            completion_time = row['CompletionTime']
+            eeg_index = int(row['EEGIndex'])
+
+            if np.isnan(eeg_index) or eeg_index >= len(condition_segments):
+                continue
+
+            # Calculate the EEG time
+            eeg_time = (condition_segments[eeg_index, 1] - condition_segments[eeg_index, 0]) / sfreq
+
+            # Check if the EEG time matches the completion time within a threshold
+            if np.abs(eeg_time - completion_time) < 0.1:
+                trialcounter = condition_segments[eeg_index, 2]
+                updated_trials[np.where(updated_trials[:, 2] == trialcounter)[0], 4] = trial_number
 
     return updated_trials
 

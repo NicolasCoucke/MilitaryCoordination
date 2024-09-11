@@ -48,10 +48,9 @@ def calculate_connectivity(pair):
     for root, dirs, files in os.walk(prep_path):
         for name in files:
             if 'manual_checked_pair' in name:
-                print("processing file " + name)
+               
                 file_path = os.path.join(prep_path, name)
                 # define paths
-                print(file_path)
                 
                 split_name = name.split("pair_")
                 _pair = int(split_name[1])
@@ -66,7 +65,8 @@ def calculate_connectivity(pair):
                     cleaned_epochs_AR = pickle.load(input_file)
 
             
-                
+                print("processing file " + name)
+
                 preproc_S1 = cleaned_epochs_AR[0]
                 preproc_S2 = cleaned_epochs_AR[1]
 
@@ -89,8 +89,8 @@ def calculate_connectivity(pair):
                 filtered_event_id = {key: value for key, value in event_id.items() if ((('Synchronous' in key) and ('Success/Checkpoint' in key)) or (('Individual' in key) and ('Success/Checkpoint' in key)) or ('Success/Start' in key) or ('Success/Desyncpoint' in key)) }
                 
                 # Print the filtered event IDs
-                for key in filtered_event_id.keys():
-                    print(key)
+                #for key in filtered_event_id.keys():
+                 #   print(key)
 
                 preproc_S1 = preproc_S1[list(filtered_event_id.keys())]
                 preproc_S2 = preproc_S2[list(filtered_event_id.keys())]
@@ -101,7 +101,7 @@ def calculate_connectivity(pair):
                 n_cycles = freqs / 4.  # Different number of cycle per frequency
 
                 # Define wavelet parameters
-                decim = 2  # To reduce computation time, you can increase this number
+                decim = 1  # To reduce computation time, you can increase this number
                 n_jobs = 1  # Number of parallel jobs to run. Can be increased if your machine supports it.
 
                 motor_channels = ["C3", "C1", "Cz", "C2", "C4"]
@@ -128,7 +128,7 @@ def calculate_connectivity(pair):
                 for name in filtered_event_id.keys():
                     new_event_ids.append(name.rsplit('/', 1)[0])
                 print(new_event_ids)
-            
+                STOP
                 power_1 = tfr_morlet(preproc_S1, freqs=freqs, n_cycles=n_cycles, use_fft=True,
                                     return_itc=False, output = "complex", decim=decim, n_jobs=n_jobs, average = False)    
                     
@@ -177,7 +177,7 @@ def calculate_connectivity(pair):
                         participant_1_power_values['Start'] = average_powers_1
                         participant_2_power_values['Start'] = average_powers_2
 
-                print(participant_1_power_values.keys())
+                #print(participant_1_power_values.keys())
                
             
                 storepath = os.path.join(connectivity_path, 'individual_tfr_pair'+ str(pair))
@@ -204,7 +204,7 @@ def calculate_connectivity(pair):
                 pair_imcoh_values = dict()
                 pair_ppc_values = dict()
                 pair_trf_synchrony = dict()
-
+                pair_trf_plv = dict()
 
                 for condition in new_event_ids:
                     try: 
@@ -235,6 +235,7 @@ def calculate_connectivity(pair):
 
                     # Initialize an array to hold the PPC values for each epoch, channel, and frequency band
                     ppc_over_time = np.zeros((n_epochs, n_channels, n_frequency_bands, n_times))
+
                     ppc = np.zeros((n_epochs, n_channels, n_frequency_bands))
                     imcoh = np.zeros((n_epochs, n_channels, n_frequency_bands))
                     for epoch in range(n_epochs):
@@ -245,18 +246,18 @@ def calculate_connectivity(pair):
                                 Y = signal_2[epoch, channel, i, :]
 
                                 #IMAGINARY COHERENCE 
-                                cross_spectrum = np.mean(X * np.conj(Y), axis=-1)
+                                #cross_spectrum = np.mean(X * np.conj(Y), axis=-1)
 
-                                auto_spectrum1 = np.mean(X * np.conj(X), axis=-1)
-                                auto_spectrum2 = np.mean(Y * np.conj(Y), axis=-1)
+                                #auto_spectrum1 = np.mean(X * np.conj(X), axis=-1)
+                                #auto_spectrum2 = np.mean(Y * np.conj(Y), axis=-1)
 
                                 # now calculculate the imaginary coherence
-                                imag_coherence = np.abs(np.imag(cross_spectrum / np.sqrt(auto_spectrum1 * auto_spectrum2)))
+                                #imag_coherence = np.abs(np.imag(cross_spectrum / np.sqrt(auto_spectrum1 * auto_spectrum2)))
 
 
                                 # and take the coefficients that belong to the frequency of interest
 
-                                imcoh[epoch, channel, i] = np.mean(imag_coherence)  
+                                #imcoh[epoch, channel, i] = np.mean(imag_coherence)  
 
 
                                 #PROJECTED POWER CORRELATIONS 
@@ -277,25 +278,46 @@ def calculate_connectivity(pair):
                             # X_orthogonal = np.mean(X_orthogonal, axis = 0) 
                                 #Y_orthogonal = np.mean(Y_orthogonal, axis = 0) 
 
+                                # get the phase of the orthogonal signals
+                                X_analytic = hilbert(X_orthogonal)
+                                Y_analytic = hilbert(Y_orthogonal)
+
+                                phase1 = np.angle(X_analytic)
+                                phase2 = np.angle(Y_analytic)
+                                
+                                # Compute the phase difference
+                                phase_diff = phase1 - phase2
+                                ppc_over_time[epoch, channel, i, :] = phase_diff
 
 
+                                # remove edge artifacts:
+                                phase_diff = phase_diff[128:-128]
 
                                 # Compute correlation between the magnitudes of the orthogonal projections
                                 if np.std(Y_orthogonal) * np.std(X_orthogonal) != 0:  # Avoid division by zero
                                     ppc_value = np.corrcoef(Y_orthogonal, X_orthogonal)[0, 1]
+                                    PLV_value = np.abs(np.sum(np.exp(1j * phase_diff)) / len(phase_diff))
                                 else:
                                     ppc_value = 0  # Assign a default value in case of std deviation being zero
+
+
+                                # compute the PLV between the enveloppes
                             
                                 ppc[epoch, channel, i] = ppc_value
+                                imcoh[epoch, channel, i]  = PLV_value
 
 
                     # now average over the epochs and store for this pair-condition
                     pair_ppc_values[condition] = np.mean(ppc, axis = 0)
                     pair_imcoh_values[condition] = np.mean(imcoh, axis = 0)
 
-
+                    pair_trf_synchrony[condition] = np.mean(ppc_over_time, axis = 0)
+                     
                     # now calculate instantaneous coupling between amplitude enveloppes
                     #n_freq_bands = 4
+
+
+                    """
 
                     freq_bands = {'Theta': [4, 7],
                                 'Alpha': [8, 12],
@@ -304,46 +326,81 @@ def calculate_connectivity(pair):
                     freq_bands = OrderedDict(freq_bands)
 
                     trf_ppc = np.zeros((n_epochs, n_channels, n_frequency_bands, n_times))
+                    trf_plv = np.zeros((n_epochs, n_channels, n_frequency_bands, n_times))
                     for epoch in range(n_epochs):
                         for channel in range(n_channels):
                             for freq in range(len(freqs)):
                                 
-
+                                
                                 X = signal_1[epoch, channel, freq, :]
                                 Y = signal_2[epoch, channel, freq, :]
 
-                                X = np.pad(X, (128, 0), 'constant')
-                                Y = np.pad(Y, (128, 0), 'constant')
-
+                                X = np.pad(X, (256, 0), 'constant')
+                                Y = np.pad(Y, (256, 0), 'constant')
+                                
+                                
                                 phase_A = np.angle(X)
                                 phase_B = np.angle(Y)
 
                                 # Compute the phase difference
                                 phase_diff = phase_A - phase_B
 
+                                #PROJECTED POWER CORRELATIONS 
+                                X_coeff = X
+                                Y_coeff = Y
+                                
+                                # extract the parts of X and Y that are orthogonal to each other
+                                
+                                X_orthogonal = np.imag((X_coeff) * np.conj(Y_coeff) / np.abs(Y_coeff))
+                                Y_orthogonal = np.imag((Y_coeff) * np.conj(X_coeff) / np.abs(X_coeff))    
+
+                                # get the absolute values of the orthogonal parts
+                                
+                                X_orthogonal = np.abs(X_orthogonal)
+                                Y_orthogonal = np.abs(Y_orthogonal)
+
+                                X_analytic = hilbert(X_orthogonal)
+                                Y_analytic = hilbert(Y_orthogonal)
+
+                                phase1 = np.angle(X_analytic)
+                                phase2 = np.angle(Y_analytic)
+                                
+                                # Compute the phase difference
+                                phase_diff = phase1 - phase2
+
                                 
                                 # Define parameters
                                 n = len(phase_diff)
-                                window_size = 128
+                                window_size = 256
                                 num_points = n - window_size  # Adjust for zero-padding
 
-                            # Initialize an empty matrix to hold all windows
-                                sub_phase_diff_windows = np.zeros((num_points, window_size))
-
                                 # Fill the matrix with sliding windows of phase_diff
+                                ppc_time_series = np.zeros((num_points,))
+                                plv_time_series = np.zeros((num_points,))
                                 for i in range(num_points):
-                                    sub_phase_diff_windows[i, :] = phase_diff[i:i+window_size]
+                                    if np.std(Y_orthogonal[i:i+window_size]) * np.std(X_orthogonal[i:i+window_size]) != 0:  # Avoid division by zero
+                                        ppc_value = np.corrcoef(Y_orthogonal[i:i+window_size], X_orthogonal[i:i+window_size])[0, 1]
+                                        PLV_value = np.abs(np.sum(np.exp(1j * phase_diff[i:i+window_size])) / len(phase_diff[i:i+window_size]))
+                                    else:
+                                        ppc_value = 0  # Assign a default value in case of std deviation being zero
+                                        PLV_value = 0
 
-                                # Compute PLV for each window
-                                exp_values = np.exp(1j * sub_phase_diff_windows)
-                                PLV_values = np.abs(np.mean(exp_values, axis=1))
+                                    ppc_time_series[i] = ppc_value
+                                    plv_time_series[i] = PLV_value
 
-                                trf_ppc[epoch, channel, freq, :num_points] = PLV_values
+                                    #sub_X_windows[i, :] = X_orthogonal[i:i+window_size]
+                                    #sub_Y_windows[i, :] = Y_orthogonal[i:i+window_size]
+                               
+                                trf_ppc[epoch, channel, freq, :num_points] = ppc_time_series#PLV_values
+                                trf_plv[epoch, channel, freq, :num_points] = plv_time_series#PLV_values
+
+
                     print('condition calculated')
 
                     # average over trials and store as instantaneous power synchrony measure
                     pair_trf_synchrony[condition] = np.mean(trf_ppc, axis = 0)
-
+                    pair_trf_plv[condition] = np.mean(trf_plv, axis = 0)
+                    """
 
                 
                 storepath = os.path.join(connectivity_path, 'homologous_connectivity_pair_'+ str(pair))
@@ -351,10 +408,17 @@ def calculate_connectivity(pair):
                     pickle.dump([pair_imcoh_values, pair_ppc_values], output_file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-                storepath = os.path.join(connectivity_path, 'homologous_tfr_pair_'+ str(pair))
+                storepath = os.path.join(connectivity_path, 'homologous_tfr_ppc_pair_'+ str(pair))
                 with open(storepath, "wb") as output_file: 
                     pickle.dump(pair_trf_synchrony, output_file, protocol=pickle.HIGHEST_PROTOCOL)
 
+
+#for pair in range(18,45):#[26, 28, 31, 32, 36, 33, 37, 39, 40, 41, 42, 43, 44]:
+#    calculate_connectivity(pair)
+
+for pair in range(1,45):#[26, 28, 31, 32, 36, 33, 37, 39, 40, 41, 42, 43, 44]:
+    calculate_connectivity(pair)
+"""
 try:
     if __name__ == '__main__':
         pool_obj = multiprocessing.Pool(processes = 4)
@@ -369,3 +433,45 @@ except:
     except:
         for pair in range(1,45):#[26, 28, 31, 32, 36, 33, 37, 39, 40, 41, 42, 43, 44]:
             calculate_connectivity(pair)
+"""
+
+
+# Initialize an empty matrix to hold all windows
+"""
+new WAY FOR TIME DATA STUFF
+sub_phase_diff_windows = np.zeros((num_points, window_size))
+
+# Fill the matrix with sliding windows of phase_diff
+for i in range(num_points):
+    sub_phase_diff_windows[i, :] = phase_diff[i:i+window_size]
+
+# Compute PLV for each window
+exp_values = np.exp(1j * sub_phase_diff_windows)
+PLV_values = np.abs(np.mean(exp_values, axis=1))
+"""
+
+#sub_X_windows = np.zeros((num_points, window_size))
+#sub_Y_windows = np.zeros((num_points, window_size))
+
+"""
+# Fill the matrix with sliding windows of phase_diff
+# Calculate standard deviations
+std_Y = np.std(Y_windows, axis=1)
+std_X = np.std(X_windows, axis=1)
+
+# Avoid division by zero by setting a mask
+non_zero_mask = (std_Y * std_X) != 0
+
+# Initialize time series arrays
+ppc_time_series = np.zeros((num_points,))
+plv_time_series = np.zeros((num_points,))
+
+# Compute PPC and PLV values for non-zero standard deviation windows
+ppc_time_series[non_zero_mask] = np.array([
+    np.corrcoef(Y_windows[i], X_windows[i])[0, 1]
+    for i in np.where(non_zero_mask)[0]
+])
+
+plv_time_series[non_zero_mask] = np.abs(np.sum(np.exp(1j * phase_windows[non_zero_mask]), axis=1) / window_size)
+
+"""

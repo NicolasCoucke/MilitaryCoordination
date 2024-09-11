@@ -5,7 +5,7 @@ import matplotlib as mpl
 from Trial import TrialClass
 import os
 from scipy import signal
-from behavioral.Pair import PairClass
+from Pair import PairClass
 import scipy.io
 import seaborn as sns
 import pickle
@@ -26,7 +26,6 @@ FailureList = []
 trial = 0
 
 isMilitary = True
-
 
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\behavioral data"
 os.chdir(path)

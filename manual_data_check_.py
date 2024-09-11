@@ -61,13 +61,14 @@ for root, dirs, files in os.walk(prep_path):
             pair = int(split_name[1])
 
        
-            if pair !=31:
-                continue
+            #if pair !=31:
+             #   continue
 
             with open(file_path,"rb") as input_file:
                 cleaned_epochs_AR = pickle.load(input_file)
-
-      
+            
+            for i in range(np.size(cleaned_epochs_AR[0].events, 0)):
+                print(cleaned_epochs_AR[0].events[i,:])
 
             data1 = cleaned_epochs_AR[0].get_data().copy()
             data2 = cleaned_epochs_AR[1].get_data().copy()
@@ -108,7 +109,7 @@ for root, dirs, files in os.walk(prep_path):
             # Step 3: Merge bad epochs lists
             combined_bad_epochs = visualization_epochs.drop_log
             rejected_epochs_indices_1 = [i for i, log in enumerate(combined_bad_epochs) if len(log) > 0]
-
+            print(rejected_epochs_indices_1 )
 
             # Step 4: Reject bad epochs from both Epochs objects
             cleaned_epochs_AR[0].drop(indices=rejected_epochs_indices_1, reason='manual rejection', verbose=True)

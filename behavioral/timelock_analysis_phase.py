@@ -10,6 +10,7 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.signal import hilbert
+from scipy.signal import butter, filtfilt
 
 
 def Moving_average(time_series, num_samples):
@@ -192,6 +193,17 @@ def calculate_average_KOP(signal1, signal2, window_length, window_step):
 
     return KOP_in_time, interval_times, mean_KOP
 
+def butter_lowpass(cutoff, fs, order=5):
+    nyquist = 0.5 * fs
+    normal_cutoff = cutoff / nyquist
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    return b, a
+
+def lowpass_filter(data, cutoff, fs, order=5):
+    b, a = butter_lowpass(cutoff, fs, order=order)
+    y = filtfilt(b, a, data)
+    return y
+
 
 def get_phase_measures(PLV, KOP, index):
     # get time locked trajectories if player two is first
@@ -209,6 +221,17 @@ def get_phase_measures(PLV, KOP, index):
             PLV_trajectory.append(np.nan)
             KOP_trajectory.append(np.nan)
     return PLV_trajectory, KOP_trajectory
+
+
+def get_cross_correlation(speed_1_x, speed_1_y, speed_2_x, speed_2_y, index):
+    # get time locked trajectories if player two is first
+    correlation_array_x = np.correlate(speed_1_x[index-50: index+50], speed_2_x[index-50: index+50], mode = 'full')
+    correlation_array_y = np.correlate(speed_1_y[index-50: index+50], speed_2_y[index-50: index+50], mode = 'full')
+
+    correlation_array = (correlation_array_x + correlation_array_y) / 2
+    
+    return correlation_array
+
 
 
 def get_distance_trajectory(trial, index, checkpoint_1, checkpoint_2):
@@ -310,7 +333,7 @@ for Li in range(2):
 
 
 def get_all_trajectories():
-    distance_trajectories = pd.DataFrame(columns = ["KOP_trajectory", "PLV_trajectory", "pair", "success", "sync", "hierarchy", "who_first", "who_leader"])
+    distance_trajectories = pd.DataFrame(columns = ["KOP_trajectory", "PLV_trajectory", "cross_correlation", "pair", "success", "sync", "hierarchy", "who_first", "who_leader"])
     for Li in range(2):
         data = all_data[Li]
         if Li == 0:
@@ -355,7 +378,14 @@ def get_all_trajectories():
                         speed_1 = Moving_average(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),20)
                         speed_2 = Moving_average(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),20)
 
-                        
+                        speed_1 = lowpass_filter(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),10, 100, 5)
+                        speed_2 = lowpass_filter(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),10, 100, 5)
+
+                        speed_1_x = lowpass_filter(grad_1_x,10, 100, 5)
+                        speed_2_x = lowpass_filter(grad_2_x,10, 100, 5)
+
+                        speed_1_y = lowpass_filter(grad_1_y,10, 100, 5)
+                        speed_2_y = lowpass_filter(grad_2_y,10, 100, 5)
                             
                         #plt.show()
                         analytic_signal1 = hilbert(speed_1[startindex+20:-20])
@@ -428,12 +458,16 @@ def get_all_trajectories():
                                             # get time locked trajectories if player one is first
                                             PLV_trajectory, KOP_trajectory = get_phase_measures(PLV, KOP, index_1)
 
+                                            cross_correlation = get_cross_correlation(speed_1_x, speed_1_y, speed_2_x, speed_2_y, index_1)
+                                            plt.plot(cross_correlation)
+                                            plt.show()
+
                                             # if player 1 is first than we should invert it so that the phase difference shows how much player one 'leads' before player 2
                                             PLV_trajectory = [-x for x in PLV_trajectory]
 
                                             # insert here procedure to get the plv and kop
 
-                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory,
+                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory, "cross_correlation": cross_correlation,
                                                        "group": group, "pair": pair.Pair,
                                                        "success": True, "sync": True, "hierarchy": hierarchy,
                                                        "who_first": who_first,
@@ -456,7 +490,7 @@ def get_all_trajectories():
 
                                             # insert here procedure to get the plv and kop
 
-                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory,
+                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory, "cross_correlation": cross_correlation,
                                                        "success": True, "sync": True, "hierarchy": hierarchy, "who_first": who_first,
                                                        "who_leader": who_leader}
                                             distance_trajectories = distance_trajectories._append(new_row, ignore_index=True)
@@ -505,7 +539,7 @@ def get_all_trajectories():
 
                                             # insert here procedure to get the plv and kop
 
-                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory,
+                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory, "cross_correlation": cross_correlation,
                                                        "group": group, "pair": pair.Pair,
                                                        "success": True, "sync": False, "hierarchy": hierarchy,
                                                        "who_first": who_first,
@@ -529,7 +563,8 @@ def get_all_trajectories():
 
                                             # insert here procedure to get the plv and kop
 
-                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory,
+                                            # add the DT!!!!!!!
+                                            new_row = {"KOP_trajectory": KOP_trajectory, "PLV_trajectory": PLV_trajectory, "cross_correlation": cross_correlation,
                                                        "group": group, "pair": pair.Pair,
                                                        "success": True, "sync": False, "hierarchy": hierarchy, "who_first": who_first,
                                                        "who_leader": who_leader}

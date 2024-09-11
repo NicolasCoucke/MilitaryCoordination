@@ -18,6 +18,9 @@ from scipy.stats import mannwhitneyu
 from scipy.signal import hilbert
 
 
+from scipy.signal import butter, filtfilt
+
+
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\behavioral data"
 #path = r"C:\Users\Administrator\Documents\Google\PhD documents\PhD documents\HYPERSCANNING_GAMEDATA"
 
@@ -34,11 +37,25 @@ os.chdir(path)
 # put the speeds in cm/seconds
 
 
-
 with open(r"CivilianFiles.pickle", "rb") as input_file:
     CivilianList = pickle.load(input_file)
 with open(r"MilitaryFiles.pickle", "rb") as input_file:
     MilitaryList = pickle.load(input_file)
+
+
+
+
+
+def butter_lowpass(cutoff, fs, order=5):
+    nyquist = 0.5 * fs
+    normal_cutoff = cutoff / nyquist
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    return b, a
+
+def lowpass_filter(data, cutoff, fs, order=5):
+    b, a = butter_lowpass(cutoff, fs, order=order)
+    y = filtfilt(b, a, data)
+    return y
 
 
 def Moving_average(time_series, num_samples):
@@ -286,8 +303,11 @@ for Li in range(2):
                     grad_1_y = np.gradient(np.asarray(trial.Player_1_y))
                     grad_2_y = np.gradient(np.asarray(trial.Player_2_y))
 
-                    speed_1 = Moving_average(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),20)
-                    speed_2 = Moving_average(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),20)
+                    #speed_1 = Moving_average(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),20)
+                    #speed_2 = Moving_average(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),20)
+
+                    speed_1 = lowpass_filter(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),5, 100, 5)
+                    speed_2 = lowpass_filter(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),5, 100, 5)
 
                     speed_1 = speed_1[:-1]
                     speed_2 = speed_2[:-1]
@@ -383,6 +403,7 @@ for Li in range(2):
                                 if condition == "Sync_Egalitarian" or condition == "Sync_LF" or condition == "Sync_FL":
                                     axs[0].axvspan(trial.time[startindex:][index_1], trial.time[startindex:][index_2], color='green',
                                                 alpha=0.2)
+                                                
                                     dTCheck += np.abs(index_2 - index_1)
                                     CheckCount+=1
                                 else:
@@ -411,14 +432,24 @@ for Li in range(2):
                     player1plot.set_label('Player 1')
                     player2plot, = axs[0].plot(trial.time[startindex:],speed_2[startindex:])
                     player2plot.set_label('Player 2')
+
+                    player1plot, = axs[1].plot(np.asarray(trial.Player_1_x[startindex:-1]), np.asarray(trial.Player_1_y[startindex:-1]))
+                    player1plot.set_label('Player 1')
+                    player2plot, = axs[1].plot(np.asarray(trial.Player_2_x[startindex:-1]), np.asarray(trial.Player_2_y[startindex:-1]))
+                    player2plot.set_label('Player 2')
                     # ax.legend()
 
+                    axs[2].plot(np.asarray(trial.Player_1_x[startindex:-1]) - np.asarray(trial.Player_2_x[startindex:-1]))
+                    plt.show()
 
                     correlation_x = np.corrcoef(Moving_average(grad_1_x[startindex:], 20),Moving_average(grad_2_x[startindex:], 20))
                     correlation_y = np.corrcoef(Moving_average(grad_1_y[startindex:], 20),Moving_average(grad_2_y[startindex:], 20))
                     correlation = (correlation_x + correlation_y)/2
                     #correlation_array = np.correlate(trial.Player_1_x[startindex:],trial.Player_2_x[startindex:], mode = 'full')
                     correlation_array = np.correlate(Moving_average(grad_1_x[startindex:], 20),Moving_average(grad_2_x[startindex:], 20), mode = 'full')
+
+                  
+
                     k = (np.argmax(correlation_array) - 0.5*(len(correlation_array)-1))/100
                     average_acceleration = np.mean(Moving_average(grad_1_x[startindex:], 20))
 
@@ -432,8 +463,8 @@ for Li in range(2):
                     axs[0].set_title('pair ' + str(pair.Pair) + ' dV ' + str(dV) +  ' corr ' + str(np.round(correlation[1,0],4)) + ' lag ' + str(k) + ' accel ' + str(np.round(average_acceleration, decimals = 2)))
 
 
-                    # player1plot, = plt.plot(trial.time[startindex:],speed_1[startindex:] - speed_2[startindex:])
-                   # plt.show()
+                    player1plot, = plt.plot(trial.time[startindex:],speed_1[startindex:] - speed_2[startindex:])
+                    plt.show()
 
                     
 

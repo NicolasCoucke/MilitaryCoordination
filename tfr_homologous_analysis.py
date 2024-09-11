@@ -32,25 +32,34 @@ from hypyp import prep
 from hypyp import stats
 from hypyp import viz
 """
+
+# NOTE: can efficiently calculate plv and correlation here per time window for the specific freq and channels we want
+
 path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1"
 
 connectivity_path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\time locked connectivity"
 # loop through all data files
-individual_stack = np.zeros((44,512))
-sync_egal_stack = np.zeros((44,512))
-leader_stack = np.zeros((44,512))
-follower_stack = np.zeros((44,512))
-complementary_sync_egal_stack = np.zeros((44,512))
-complementary_leader_stack = np.zeros((44,512))
-complementary_follower_stack = np.zeros((44,512))
+individual_stack = np.zeros((64,44,512))
+sync_egal_stack = np.zeros((64,44,512))
+leader_stack = np.zeros((64,44,512))
+follower_stack = np.zeros((64,44,512))
+complementary_sync_egal_stack = np.zeros((64,44,512))
+complementary_leader_stack = np.zeros((64,44,512))
+complementary_follower_stack = np.zeros((64,44,512))
 
 stack_dict = dict()
 military_stack_dict = dict()
+baseline_stack_dict = dict()
+baseline_military_stack_dict = dict()
+
 condition_names = ['Synchronous/Egalitarian', 'Synchronous/LeaderFollower', 'Synchronous/FollowerLeader', 'Individual/Egalitarian', 'Complementary/Egalitarian', 'Complementary/LeaderFollower', 'Complementary/FollowerLeader']
 for condition in condition_names:
-    condition_stack = np.zeros((44,512))    
-    stack_dict[condition] = condition_stack
-    military_stack_dict[condition] = condition_stack
+    #condition_stack = np.zeros((44,512))    
+    stack_dict[condition] = []
+    military_stack_dict[condition] = []
+
+    baseline_stack_dict[condition] = []
+    baseline_military_stack_dict[condition] = []
 
 biosemi64_montage = mne.channels.make_standard_montage('biosemi64')
 # change the channel names in our epochs so that they are the same as the montage
@@ -66,7 +75,7 @@ for i in range(len(motor_channels)):
 pair = 1
 for root, dirs, files in os.walk(connectivity_path):
     for name in files:
-        if 'homologous_tfr_pair' in name:
+        if 'homologous_tfr_ppc_pair' in name:
             print("processing file " + name)
 
             file_path = os.path.join(connectivity_path, name)
@@ -80,7 +89,7 @@ for root, dirs, files in os.walk(connectivity_path):
             #    continue
 
             
-
+           
 
             with open(file_path,"rb") as input_file:
                 pair_ppc_values = pickle.load(input_file)
@@ -88,8 +97,10 @@ for root, dirs, files in os.walk(connectivity_path):
 
             #if len(participant_1_power_values.keys()) != 7:
             #    continue
-
+            print(pair_ppc_values.keys())
         
+
+
             #print(participant_power_values )
             #print(np.shape(participant_1_power_values['Synchronous/Egalitarian']))
 
@@ -100,35 +111,278 @@ for root, dirs, files in os.walk(connectivity_path):
                             'Gamma': [30, 45]}
             freq_bands = OrderedDict(freq_bands)
             # select condition and frequency band
-            event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
+            event_id = {'Synchronous/Egalitarian': 2, 'Synchronous/LeaderFollower': 3, 'Synchronous/FollowerLeader': 4, 'Individual/Egalitarian': 5, 'Complementary/Egalitarian': 6, 'Complementary/LeaderFollower': 7, 'Complementary/FollowerLeader': 8}
 
-            skip = False
+            #check if both checkpoints and baselines are in data
+            skip = True
             for condition in condition_names:
                     
-                cond_name = str(condition + '/Success/Checkpoint')
+                cond_name = str(condition + '/Succes')
 
+                for name in pair_ppc_values.keys():
+                    if (condition in name) and ('Start' in name):
+                        for name in pair_ppc_values.keys():
+                            if (condition in name) and ('point' in name):
+                                skip = False
                 
-                if cond_name not in pair_ppc_values.keys():
-                    skip = True
-                    
             if skip:
                 continue
 
         
                 
-
-            for condition in condition_names:
-
-                    cond_name = str(condition + '/Success/Checkpoint')
+            try:
+                skip = False
+                for condition in condition_names:
+                    
+                    if 'Complementary' in condition:
+                        cond_name = str(condition + '/Success/Desyncpoint')
+                    else:
+                        cond_name = str(condition + '/Success/Checkpoint')
                     condition_data = pair_ppc_values[cond_name]
                     
-                    channel_data = np.mean(condition_data[motor_channel_numbers,:,:], axis = 0)
-             
-                    if pair > 4:
-                        stack_dict[condition] = np.dstack((stack_dict[condition], channel_data))
-                    else:
-                        military_stack_dict[condition] = np.dstack((stack_dict[condition], channel_data))
+                    #channel_data = np.mean(condition_data[motor_channel_numbers,:,:], axis = 0)
+
+                    baseline_cond_name = str(condition + '/Success/Start')
+                    baseline_condition_data = pair_ppc_values[cond_name]
+                    #baseline_channel_data = np.mean(condition_data[motor_channel_numbers,:,:], axis = 0)
+            except:
+                continue
+
+            skip = False
+            for condition in condition_names:
+                
+                if 'Complementary' in condition:
+                    cond_name = str(condition + '/Success/Desyncpoint')
+                else:
+                    cond_name = str(condition + '/Success/Checkpoint')
+                condition_data = pair_ppc_values[cond_name]
+
+                condition_data = np.abs(condition_data)
+                
+                #channel_data = np.mean(condition_data[motor_channel_numbers,:,:], axis = 0)
+
+                baseline_cond_name = str(condition + '/Success/Start')
+                baseline_condition_data = pair_ppc_values[cond_name]
+                #baseline_channel_data = np.mean(condition_data[motor_channel_numbers,:,:], axis = 0)
+            
+                if pair > 20:
+                    stack_dict[condition].append(condition_data)
+                    baseline_stack_dict[condition].append(baseline_condition_data)
+                else:
+                    military_stack_dict[condition].append(condition_data)
+                    baseline_military_stack_dict[condition].append(baseline_condition_data)
+
+
+
+baselines = []
+military_baselines = []            
+for condition in condition_names:
+                        
+    stack_dict[condition] =  np.stack(stack_dict[condition], axis = 3)
+    military_stack_dict[condition] =  np.stack(military_stack_dict[condition], axis = 3)
+
+    baseline_stack_dict[condition] =  np.stack(baseline_stack_dict[condition], axis = 3)
+    baseline_military_stack_dict[condition] =  np.stack(baseline_military_stack_dict[condition], axis = 3)
+
+    if 'Individual' in condition :
+        stack_dict['Start'] = baseline_stack_dict[condition]
+        military_stack_dict['Start'] = baseline_military_stack_dict[condition]
+  
+
+
+
+
+
+
+def remove_outliers(data_stack, z_score_threshold=3):
+    """
+    Remove outliers from a 3D stack of data along the third dimension.
     
+    :param data_stack: 3D numpy array from which to remove outliers
+    :param z_score_threshold: Threshold of Z-scores to consider as an outlier
+    :return: 3D numpy array with outliers set to NaN
+    """
+    # first average across time dimension
+    data_stack_time_mean = np.mean(data_stack, axis = 2, keepdims = True)
+
+    # then calculate mean and std across the participants
+    mean = np.mean(data_stack_time_mean, axis=3, keepdims=True)
+    std = np.std(data_stack_time_mean, axis=3, keepdims=True)
+    
+    # Calculate Z-scores
+    z_scores = (data_stack_time_mean - mean) / std
+    
+    # Identify outliers
+    outliers = np.abs(z_scores) > z_score_threshold
+
+    # Replace outliers with NaN
+    data_stack_filtered = np.where(outliers, np.nan, data_stack)
+    
+    return data_stack_filtered
+
+
+
+# Apply the function to each stack
+baseline_stack = remove_outliers(stack_dict['Start'])
+individual_stack = remove_outliers(stack_dict['Individual/Egalitarian'])
+sync_egal_stack = remove_outliers(stack_dict['Synchronous/Egalitarian'])
+leader_stack = remove_outliers(stack_dict['Synchronous/LeaderFollower'])
+follower_stack = remove_outliers(stack_dict['Synchronous/FollowerLeader'])
+complementary_sync_egal_stack = remove_outliers(stack_dict['Complementary/Egalitarian'])
+complementary_leader_stack = remove_outliers(stack_dict['Complementary/LeaderFollower'])
+complementary_follower_stack = remove_outliers(stack_dict['Complementary/FollowerLeader'])
+
+military_baseline_stack = remove_outliers(military_stack_dict['Start'])
+military_individual_stack = remove_outliers(military_stack_dict['Individual/Egalitarian'])
+military_sync_egal_stack = remove_outliers(military_stack_dict['Synchronous/Egalitarian'])
+military_leader_stack = remove_outliers(military_stack_dict['Synchronous/LeaderFollower'])
+military_follower_stack = remove_outliers(military_stack_dict['Synchronous/FollowerLeader'])
+military_complementary_sync_egal_stack = remove_outliers(military_stack_dict['Complementary/Egalitarian'])
+military_complementary_leader_stack = remove_outliers(military_stack_dict['Complementary/LeaderFollower'])
+military_complementary_follower_stack = remove_outliers(military_stack_dict['Complementary/FollowerLeader'])
+
+
+
+#sync_egal_stack = complementary_sync_egal_stack
+# baseline per participant
+#baseline_indices = range(358,461)
+#baseline_indices_comp = range(103,206)
+
+
+def extract_freq_channel_combination(stack, freq_values, channels):
+    selected_stack = np.nanmean(stack[channels, freq_values[0]:freq_values[1], :,:], axis = (0,1))
+    return selected_stack
+
+
+"""
+def normalize_stack(data_stack, baseline_stack, baseline_indices):
+    print(np.shape(data_stack))
+    print(np.shape(baseline_stack))
+    for i in range(data_stack.shape[1]):  # Loop through participants
+        baseline_mean = np.mean(baseline_stack[baseline_indices[0]:baseline_indices[1], i])
+        data_stack[:, i] = 10 * np.log10(data_stack[:, i] / baseline_mean)
+    return data_stack
+"""
+
+
+
+def normalize_stack(data_stack, baseline_stack, baseline_indices):
+
+    for i in range(data_stack.shape[1]):  # Loop through participants
+        baseline_mean = np.mean(baseline_stack[126:-126, i])
+        baseline_std = np.std(baseline_stack[126:-126, i])
+        data_stack[:, i] = (data_stack[:, i] - baseline_mean) / baseline_std
+    return data_stack
+
+
+
+# Constants
+
+
+def plot_data(data, color, linestyle):
+    print(np.shape(data))
+    times = np.linspace(-500, 501, len(np.nanmean(data[126:-126, :], axis = 1)))
+    plt.plot(times,np.nanmean(data[126:-126, :], axis = 1), color = color, linestyle = linestyle, linewidth = 3)
+
+def plot_freq_channel(freq_band, channel_names, position):
+    baseline_indices = (256,512)  # Indices for baseline normalization
+    freq_values = freq_bands[freq_band]  # Frequency values for the Alpha band
+    time_points = np.arange(122, 378)  # Sensor indices of interest
+    channel_numbers = channel_names
+        
+    biosemi64_montage = mne.channels.make_standard_montage('biosemi64')
+    # change the channel names in our epochs so that they are the same as the montage
+    channels = biosemi64_montage.ch_names
+    for i in range(len(channel_numbers)):
+        ch_name = channel_names[i]
+        index = channels.index(ch_name)
+        channel_numbers[i] = index
+
+    sync_egal_stack_combination = extract_freq_channel_combination(sync_egal_stack, freq_values, channel_numbers)
+    complementary_sync_egal_stack_combination = extract_freq_channel_combination(complementary_sync_egal_stack, freq_values, channel_numbers)
+    baseline_stack_combination = extract_freq_channel_combination(baseline_stack, freq_values, channel_numbers)
+
+    military_sync_egal_stack_combination = extract_freq_channel_combination(military_sync_egal_stack, freq_values, channel_numbers)
+    military_complementary_sync_egal_stack_combination = extract_freq_channel_combination(military_complementary_sync_egal_stack, freq_values,channel_numbers)
+    military_baseline_stack_combination = extract_freq_channel_combination(military_baseline_stack, freq_values, channel_numbers)
+
+
+    # Normalize EEG data stacks
+    sync_egal_stack_combination = normalize_stack(sync_egal_stack_combination, baseline_stack_combination, baseline_indices)
+    complementary_sync_egal_stack_combination = normalize_stack(complementary_sync_egal_stack_combination, baseline_stack_combination, baseline_indices)
+
+    military_sync_egal_stack_combination = normalize_stack(military_sync_egal_stack_combination, military_baseline_stack_combination, baseline_indices)
+    military_complementary_sync_egal_stack_combination = normalize_stack(military_complementary_sync_egal_stack_combination, military_baseline_stack_combination, baseline_indices)
+
+
+
+
+    plot_data(sync_egal_stack_combination, 'blue', '-')
+    plot_data(complementary_sync_egal_stack_combination, 'orange', '-')
+
+    plot_data(military_sync_egal_stack_combination, 'blue', '--')
+    plot_data(military_complementary_sync_egal_stack_combination, 'orange', '--')
+
+    plt.ylabel('Normalized PLV')
+    plt.xlabel('Time (ms)')
+    plt.title(freq_band + ' ' + position)
+
+    legend_colors = [plt.Line2D([0], [0], color='blue', lw=4), plt.Line2D([0], [0], color='orange', lw=4)]
+    legend_styles = [plt.Line2D([0], [0], color='black', linestyle='-', lw=4), plt.Line2D([0], [0], color='black', linestyle='--', lw=4)]
+
+    # Add legends to the plot
+    ax = plt.gca()
+    color_legend = ax.legend(handles=legend_colors, labels=['Synchronous', 'Complementary'], loc='upper right', title="Condition")
+    ax.add_artist(color_legend)  # Manually add the first legend back
+    style_legend = ax.legend(handles=legend_styles, labels=['Military', 'Civilians'], loc='lower right', title="Group")
+
+
+    plt.show()
+
+
+
+parietal_channels = ['CP6', 'P8', 'P6', 'P4', 'CP4', 'TP8']
+plot_freq_channel('Alpha', parietal_channels, 'parietal')
+
+motor_channels = ["C3", "C1", "Cz", "C2", "C4"]
+plot_freq_channel('Alpha', motor_channels, 'central')
+
+motor_channels = ["C3", "C1", "Cz", "C2", "C4"]
+plot_freq_channel('Beta', motor_channels, 'central')
+
+frontal_channels = ["AF3", "AFz", "AF4", "F3", "F1", "Fz", "F2", "F4"]
+plot_freq_channel('Alpha', frontal_channels, 'frontal')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -153,7 +407,7 @@ def remove_outliers(data_stack, z_score_threshold=3):
     # Replace outliers with NaN
     data_stack_filtered = np.where(outliers, np.nan, data_stack)
     
-    return data_stack_filtered
+    return data_stack
 
 # Apply the function to each stack
 individual_stack = remove_outliers(stack_dict['Individual/Egalitarian'])
@@ -172,6 +426,26 @@ military_complementary_sync_egal_stack = remove_outliers(military_stack_dict['Co
 military_complementary_leader_stack = remove_outliers(military_stack_dict['Complementary/LeaderFollower'])
 military_complementary_follower_stack = remove_outliers(military_stack_dict['Complementary/FollowerLeader'])
 
+
+baseline_individual_stack = remove_outliers(baseline_stack_dict['Individual/Egalitarian'])
+baseline_sync_egal_stack = remove_outliers(baseline_stack_dict['Synchronous/Egalitarian'])
+baseline_leader_stack = remove_outliers(baseline_stack_dict['Synchronous/LeaderFollower'])
+baseline_follower_stack = remove_outliers(baseline_stack_dict['Synchronous/FollowerLeader'])
+baseline_complementary_sync_egal_stack = remove_outliers(baseline_stack_dict['Complementary/Egalitarian'])
+baseline_complementary_leader_stack = remove_outliers(baseline_stack_dict['Complementary/LeaderFollower'])
+baseline_complementary_follower_stack = remove_outliers(baseline_stack_dict['Complementary/FollowerLeader'])
+
+baseline_military_individual_stack = remove_outliers(baseline_military_stack_dict['Individual/Egalitarian'])
+baseline_military_sync_egal_stack = remove_outliers(baseline_military_stack_dict['Synchronous/Egalitarian'])
+baseline_military_leader_stack = remove_outliers(baseline_military_stack_dict['Synchronous/LeaderFollower'])
+baseline_military_follower_stack = remove_outliers(baseline_military_stack_dict['Synchronous/FollowerLeader'])
+baseline_military_complementary_sync_egal_stack = remove_outliers(baseline_military_stack_dict['Complementary/Egalitarian'])
+baseline_military_complementary_leader_stack = remove_outliers(baseline_military_stack_dict['Complementary/LeaderFollower'])
+baseline_military_complementary_follower_stack = remove_outliers(baseline_military_stack_dict['Complementary/FollowerLeader'])
+
+
+
+
 def get_t_time_series(condition_1_stack, condition_2_stack):
     """
     input should be time x num samples
@@ -189,13 +463,23 @@ baseline_indices = range(358,461)
 baseline_indices_comp = range(103,206)
 for i in range(np.size(sync_egal_stack, 2)):
     for freq in range(np.size(sync_egal_stack, 0)):
-        sync_egal_stack[freq,:,i]-= np.nanmean(sync_egal_stack[freq,baseline_indices,i])
-        individual_stack[freq,:,i] -= np.nanmean(individual_stack[freq,baseline_indices,i])
+        sync_egal_stack[freq,:,i]-= 0#np.nanmean(baseline_sync_egal_stack[freq,baseline_indices,i])
+        individual_stack[freq,:,i] -= 0#np.nanmean(baseline_individual_stack[freq,baseline_indices,i])
 
+
+sync_egal_mean = np.nanmean(sync_egal_stack, axis = 2)
+individual_mean = np.nanmean(individual_stack, axis = 2)
+# now plot only the alpha power in sensorimotor regions:
+freq_values = freq_bands['Alpha']
+plt.plot(np.nanmean(sync_egal_mean[freq_values[0]:freq_values[1], 122:378], axis = 0), color = 'blue', linestyle = '-')
+plt.plot(np.nanmean(individual_mean[freq_values[0]:freq_values[1], 122:378], axis = 0), color = 'blue', linestyle = '--')
+
+#plt.plot(np.nanmean(complementary_egal_mean[freq_values[0]:freq_values[1], 122:378], axis = 0), color = 'orange', linestyle = '--')
+plt.show()
 
 for freq_key, freq_values in freq_bands.items():
     stack_1 = np.nanmean(sync_egal_stack[freq_values[0]:freq_values[1], 103:358,:], axis = 0)
-    stack_2 = np.nanmean(individual_stack[freq_values[0]:freq_values[1], 103:358,:], axis = 0)
+    stack_2 = np.nanmean(baseline_sync_egal_stack[freq_values[0]:freq_values[1], 103:358,:], axis = 0)
     t_scores, p_value=  ttest_rel(stack_1, stack_2, axis = 1, nan_policy = 'omit')
     print(np.shape(t_scores))
     plt.plot(t_scores)

@@ -1,0 +1,117 @@
+######################
+# Take the preprocessed data and do single-trial moement analysis
+######################
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+from Trial import TrialClass
+import os
+from scipy import signal
+from Pair import PairClass
+import scipy.io
+import seaborn as sns
+from scipy.fft import fft, fftfreq
+import pickle
+import re
+from scipy.stats import mannwhitneyu
+from scipy.signal import hilbert
+
+
+path = r"C:\Users\nicoucke\OneDrive - UGent\Desktop\Hyperscanning 1\behavioral data"
+#path = r"C:\Users\Administrator\Documents\Google\PhD documents\PhD documents\HYPERSCANNING_GAMEDATA"
+
+os.chdir(path)
+
+#how to exclude the big outlier positions at the beginning of trial??
+# begin at first nonzero value of either one
+# if over a threshold value: begin calculations at index after that threshold
+
+
+#correlation of speed is good measure of synchronous movement (?) but not a general measure of jaggedness
+
+
+# put the speeds in cm/seconds
+
+
+
+with open(r"CivilianFiles.pickle", "rb") as input_file:
+    CivilianList = pickle.load(input_file)
+with open(r"MilitaryFiles.pickle", "rb") as input_file:
+    MilitaryList = pickle.load(input_file)
+
+
+
+
+military_succes_ratio = []
+military_completion_time = []
+for pair in MilitaryList:
+    successratio = sum(pair.Trial_successes)/len(pair.Trial_successes)
+    average_completion_time = sum(np.asarray(pair.Trial_completion_times)[np.asarray(pair.Trial_successes)])/len(np.asarray(pair.Trial_completion_times)[np.asarray(pair.Trial_successes)])
+
+    military_succes_ratio.append(successratio)
+    military_completion_time.append(average_completion_time)
+
+civilian_succes_ratio = []
+civilian_completion_time = []
+for pair in CivilianList:
+    successratio = sum(pair.Trial_successes) / len(pair.Trial_successes)
+    average_completion_time = sum(np.asarray(pair.Trial_completion_times)[np.asarray(pair.Trial_successes)]) / len(
+        np.asarray(pair.Trial_completion_times)[np.asarray(pair.Trial_successes)])
+
+    civilian_succes_ratio.append(successratio)
+    civilian_completion_time.append(average_completion_time)
+
+data = [np.asarray(military_succes_ratio),  np.asarray(civilian_succes_ratio)]
+fig1, ax1 = plt.subplots()
+ax1.set_title('Ratio of successful trials')
+ax1.boxplot(data, labels = ['Military','Civilian'])
+plt.show()
+
+data = [np.asarray(military_completion_time),  np.asarray(civilian_completion_time)]
+fig2, ax2 = plt.subplots()
+ax2.set_title('Average completion time for successful trials')
+ax2.boxplot(data, labels = ['Military','Civilian'])
+plt.show()
+
+
+
+ax = sns.boxplot(x="population", y="success", hue="time",
+                 data=[np.asarray(military_succes_ratio), np.asarray(civilian_succes_ratio)], linewidth=2.5)
+plt.plot(ax)
+plt.show()
+
+ax = sns.boxplot(x="population", y="completion time", hue="time",
+                 data=[np.asarray(military_completion_time), np.asarray(civilian_completion_time)], linewidth=2.5)
+
+
+
+
+
+"""
+
+data = [Mil_Completion_Times, Civ_Completion_Times]
+plt.figure()
+plt.boxplot(data)
+Mav = np.round(np.mean(Mil_Completion_Times))
+Cav = np.round(np.mean(Civ_Completion_Times))
+w, p = mannwhitneyu(Mil_Completion_Times, Civ_Completion_Times)
+plt.title('Total time spent on all trials'+ ' M: ' + str(Mav) + ' C: ' + str(Cav) + ' p = ' + str(np.round(p,4 )))
+plt.show()
+
+
+
+data = [Mil_Trial_Completion_Time, Civ_Trial_Completion_Time]
+plt.figure()
+plt.boxplot(data)
+Mav = np.round(np.mean(Mil_Trial_Completion_Time))
+Cav = np.round(np.mean(Civ_Trial_Completion_Time))
+w, p = mannwhitneyu(Mil_Trial_Completion_Time, Civ_Trial_Completion_Time)
+plt.title('Average time spent on a trial (all tries)'+ ' M: ' + str(Mav) + ' C: ' + str(Cav) + ' p = ' + str(np.round(p,4 )))
+plt.show()
+"""
+
+
+
+
+

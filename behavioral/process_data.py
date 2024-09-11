@@ -17,6 +17,8 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.signal import hilbert
+from scipy.signal import butter, filtfilt
+
 
 # 1) data object for linking with EEG needs:
 # (only successful trials)
@@ -246,7 +248,115 @@ def get_distance_trajectory(trial, index, checkpoint_1, checkpoint_2):
     return trajectory_1, trajectory_2
 
 
+# Function to calculate the percentage position of each point on the individual trajectory
+def calculate_percentage_along_avg_trajectory(x_coords, y_coords, avg_x_coords, avg_y_coords, total_length_avg, cumulative_distances_avg):
+    percentages = []
+    for x, y in zip(x_coords, y_coords):
+        # Calculate distances from the point to each point on the average trajectory
+        point_distances = np.sqrt((avg_x_coords - x)**2 + (avg_y_coords - y)**2)
+        
+        # Find the index of the closest point on the average trajectory
+        closest_index = np.argmin(point_distances)
+        
+        # Calculate the cumulative distance up to the closest point
+        distance_to_point = cumulative_distances_avg[closest_index - 1] if closest_index > 0 else 0
+        
+        # Calculate the percentage of the total length
+        percentage_of_length = (distance_to_point / total_length_avg) * 100
+        
+        percentages.append(percentage_of_length)
+    
+    return np.array(percentages)
 
+                    # 5. Transform percentage differences into time differences
+def calculate_time_difference(percentages_traj_1, percentages_traj_2, percentage_diff, time,):
+    time_diffs = []
+    for i in range(len(percentage_diff)):
+        # Find the corresponding time for each percentage
+        # Assuming linear mapping between time and percentage:
+        t1 = np.interp(percentages_traj_1[i], np.linspace(0, 100, len(time)), time)
+        t2 = np.interp(percentages_traj_2[i], np.linspace(0, 100, len(time)), time)
+        
+        # Calculate the time difference
+        time_diff = t1 - t2
+        time_diffs.append(time_diff)
+    
+    return np.array(time_diffs)
+
+def calculate_time_differences(trial):
+    
+    startindex = 0
+    movement_start = False
+
+
+    grad_1_x = np.gradient(np.asarray(trial.Player_1_x))
+    grad_2_x = np.gradient(np.asarray(trial.Player_2_x))
+
+
+    grad_1_y = np.gradient(np.asarray(trial.Player_1_y))
+    grad_2_y = np.gradient(np.asarray(trial.Player_2_y))
+
+    startindex = 0
+    movement_start = False
+
+    while movement_start == False:
+        startindex+=1
+        try:
+            if grad_1_x[startindex] != 0 or grad_2_x[startindex] != 0 or grad_1_y[startindex] != 0 or grad_1_y[startindex] != 0:
+                movement_start = True
+        except:
+            break
+
+    Threshold_passed = False
+    for index in range(0,len(grad_1_x)-1):
+        if np.abs(grad_1_x[index]) > 2 or np.abs(grad_2_x[index]) > 2 or np.abs(
+            grad_2_x[index]) > 2 or np.abs(grad_2_x[index]) > 2:
+                startindex = index + 10
+
+    # Example trajectories (x and y coordinates)
+    x_coords_1 = np.array(trial.Player_1_x[startindex:])
+    y_coords_1 = np.array(trial.Player_1_y[startindex:])
+
+    x_coords_2 = np.array(trial.Player_2_x[startindex:])
+    y_coords_2 = np.array(trial.Player_2_y[startindex:]) + 5 # negative to put them on the same place
+
+    # 1. Calculate the average trajectory
+    avg_x_coords = (x_coords_1 + x_coords_2) / 2
+    avg_y_coords = (y_coords_1 + y_coords_2) / 2
+
+    # 2. Calculate the cumulative distance along the average trajectory
+    dx_avg = np.diff(avg_x_coords)
+    dy_avg = np.diff(avg_y_coords)
+    distances_avg = np.sqrt(dx_avg**2 + dy_avg**2)
+    cumulative_distances_avg = np.cumsum(distances_avg)
+    total_length_avg = cumulative_distances_avg[-1]
+
+    # 3. Apply the function to each trajectory
+    percentages_traj_1 = calculate_percentage_along_avg_trajectory(x_coords_1, y_coords_1, avg_x_coords, avg_y_coords, total_length_avg, cumulative_distances_avg)
+    percentages_traj_2 = calculate_percentage_along_avg_trajectory(x_coords_2, y_coords_2, avg_x_coords, avg_y_coords, total_length_avg, cumulative_distances_avg)
+
+    # 4. Calculate the difference in percentages for each point
+    percentage_diff = percentages_traj_1 - percentages_traj_2
+
+    time = np.array(trial.time[startindex:])
+
+
+    # Calculate time differences
+    time_diffs = calculate_time_difference(percentages_traj_1, percentages_traj_2, percentage_diff, time)
+
+    return time_diffs, avg_x_coords, avg_y_coords, percentages_traj_1, percentages_traj_2
+                                    
+
+def butter_lowpass(cutoff, fs, order=5):
+    nyquist = 0.5 * fs
+    normal_cutoff = cutoff / nyquist
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    return b, a
+
+def lowpass_filter(data, cutoff, fs, order=5):
+    b, a = butter_lowpass(cutoff, fs, order=order)
+    y = filtfilt(b, a, data)
+    return y
 
 
 all_data = []
@@ -257,8 +367,8 @@ fs = 100
 
 
 def get_all_trajectories():
-    data_dictionary = pd.DataFrame(columns = ["group", "pair", "order", "interactive", "sync", "hierarchy", "who_leader", "trial", "num_tries", "completion_time"
-                                        "phase1", "phase2", "sync_crossings1", "desync_crossings1",  "sync_crossings2", "desync_crossings2", "startindex", "KOP_100", "KOP_20", "PLV_100", "PLV_20"])
+    data_dictionary = pd.DataFrame(columns = ["group", "pair", "order", "condition", "interactive", "sync", "hierarchy", "who_leader", "trial", "num_tries", "completion_time"
+                                        "phase1", "phase2", "sync_crossings1", "desync_crossings1",  "sync_crossings2", "desync_crossings2", "startindex", "KOP_100", "KOP_20", "PLV_100", "PLV_20", "Speed", "Speed_Variability", "Speed_Variability_LF" "Asymmetry", "Lag_Variability"])
     for Li in range(2):
         data = all_data[Li]
         if Li == 0:
@@ -311,6 +421,7 @@ def get_all_trajectories():
                     startindex = 0
                     movement_start = False
 
+                    
                     grad_1_x = np.gradient(np.asarray(trial.Player_1_x))
                     grad_2_x = np.gradient(np.asarray(trial.Player_2_x))
 
@@ -322,13 +433,19 @@ def get_all_trajectories():
                     speed_1 = Moving_average(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),20)
                     speed_2 = Moving_average(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),20)
 
-                    analytic_signal1 = hilbert(speed_1)
-                    analytic_signal2 = hilbert(speed_2)
-                    full_phase1 = np.angle(analytic_signal1)
-                    full_phase2 = np.angle(analytic_signal2)
+                    speed_1 = lowpass_filter(np.sqrt(np.square(grad_1_x) + np.square(grad_1_y)),20, 100, 5)
+                    speed_2 = lowpass_filter(np.sqrt(np.square(grad_2_x) + np.square(grad_2_y)),20, 100, 5)
 
+                    speed_1_x = lowpass_filter(grad_1_x,10, 100, 5)
+                    speed_2_x = lowpass_filter(grad_2_x,10, 100, 5)
 
-                    # get the moment when movement is started
+                    speed_1_y = lowpass_filter(grad_1_y,10, 100, 5)
+                    speed_2_y = lowpass_filter(grad_2_y,10, 100, 5)
+
+                    
+                    startindex = 0
+                    movement_start = False
+
                     while movement_start == False:
                         startindex+=1
                         try:
@@ -339,8 +456,22 @@ def get_all_trajectories():
                     if movement_start == False:
                         continue
 
+                    Threshold_passed = False
+                    for index in range(0,len(grad_1_x)-1):
+                        if np.abs(grad_1_x[index]) > 2 or np.abs(grad_2_x[index]) > 2 or np.abs(
+                            grad_2_x[index]) > 2 or np.abs(grad_2_x[index]) > 2:
+                            startindex = index + 10
                     
+                    
+                    time_diffs, avg_x_coords, avg_y_coords, percentages_traj_1, percentages_traj_2 = calculate_time_differences(trial)
 
+                    analytic_signal1 = hilbert(speed_1)
+                    analytic_signal2 = hilbert(speed_2)
+                    full_phase1 = np.angle(analytic_signal1)
+                    full_phase2 = np.angle(analytic_signal2)
+
+
+     
                    
                     
                     # calculate PLV and KOP only from the moment the movement is started 
@@ -355,9 +486,44 @@ def get_all_trajectories():
                     
                     _, _, PLV_20 = calculate_average_PLV(speed_1, speed_2, 20, 10)
                     _, _, KOP_20 = calculate_average_KOP(speed_1, speed_2, 20, 10)
-
                     _, _, PLV_100 = calculate_average_PLV(speed_1, speed_2, 100, 50)
                     _, _, KOP_100 = calculate_average_KOP(speed_1, speed_2, 100, 50)
+
+
+                    # get the trajectory profile measures
+                    values = np.array(time_diffs)
+                    delay_variance = np.nanstd(time_diffs)
+
+                    # Get the number of elements below zero
+                    count_below_zero = np.sum(values< 0)
+
+                    # Get the total number of elements in the array
+                    total_count = values.size
+
+                    # Calculate the percentage
+                    percentage_below_zero = (count_below_zero / total_count)
+
+                    if percentage_below_zero > 0.5:
+                        asymmetry = percentage_below_zero
+                    else:
+                        asymmetry = 1-percentage_below_zero
+
+                    asymmetry = (asymmetry - 0.5) * 2
+                    
+                    
+                    values = np.array(0.5 * (np.abs(speed_1) + np.abs(speed_2))) * 100 *3 # 100 fps and the real distance and one unit is 3 cm
+
+                    average_speed = np.nanmean(values)
+                    speed_variance = np.nanstd(values)
+
+                    speed_1 = np.abs(speed_1) *300
+                    speed_2 = np.abs(speed_2) *300
+
+                    if 'LF' in trial.Condition:
+                        speed_variance_LF =  np.nanstd(speed_2) - np.nanstd(speed_1)
+                    else:
+                        speed_variance_LF =  np.nanstd(speed_1) - np.nanstd(speed_2)
+
 
 
 
@@ -429,10 +595,10 @@ def get_all_trajectories():
                                        desync_crossings2[checkpoint+1] = index_1
                     
 
-                    new_row = {"group": group, "pair": pair.Pair, "order": 0, "interactive": interactive, "sync": sync, "hierarchy": hierarchy, "who_leader": who_leader, "trial": trial.TrialNumber, "num_tries": num_tries,
+                    new_row = {"group": group, "pair": pair.Pair, "order": 0, "condition": trial.Condition, "interactive": interactive, "sync": sync, "hierarchy": hierarchy, "who_leader": who_leader, "trial": trial.TrialNumber, "num_tries": num_tries,
                                             "completion_time": trial.CompletionTime, "phase1": full_phase1, "phase2": full_phase2, "sync_crossings1": sync_crossings1, "desync_crossings1": desync_crossings1,
                                                 "sync_crossings2": sync_crossings2, "desync_crossings2": desync_crossings2, "startindex": startindex, 
-                                                "KOP_100": KOP_100, "KOP_20": KOP_20, "PLV_100":PLV_100, "PLV_20": PLV_20}
+                                                "KOP_100": KOP_100, "KOP_20": KOP_20, "PLV_100":PLV_100, "PLV_20": PLV_20,  "Speed": average_speed, "Speed_Variability": speed_variance, "Speed_Variability_LF": speed_variance_LF, "Asymmetry": asymmetry, "Lag_Variability": delay_variance}
                     data_dictionary = data_dictionary._append(new_row, ignore_index=True)
                     num_tries = 0
 
@@ -453,7 +619,7 @@ with open(r"Behavioral_Dataframe.pickle", "rb") as input_file:
 
 
 # Filter out columns with unwanted data types and select specific columns
-filtered_columns = ['group', 'pair', 'order', 'interactive', 'sync', 'hierarchy', "who_leader", 'trial', 'num_tries', 'completion_time', 'KOP_100', 'KOP_20', 'PLV_100', 'PLV_20']
+filtered_columns = ['group', 'pair', 'order', 'condition', 'interactive', 'sync', 'hierarchy', "who_leader", 'trial', 'num_tries', 'completion_time', 'KOP_100', 'KOP_20', 'PLV_100', 'PLV_20', "Speed", "Speed_Variability", "Speed_Variability_LF", "Asymmetry", "Lag_Variability"]
 
 # Write DataFrame to Excel file
 with pd.ExcelWriter("data_dictionary.xlsx") as writer:
@@ -461,3 +627,4 @@ with pd.ExcelWriter("data_dictionary.xlsx") as writer:
     if not data_dictionary.empty:
         data_to_write = data_dictionary[filtered_columns]
         data_to_write.to_excel(writer, index=False, sheet_name="Sheet1")
+        
